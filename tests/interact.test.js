@@ -152,9 +152,10 @@ test("house: add an unemployment event and see the installment check flag it", (
   commit($("#ev-start"), plus(70));
   commit($("#ev-end"), plus(74));
   type($("#ev-salary"), "0");
+  type($("#ev-cost-groceries"), "250");
   submit($("#event-form"));
   const ev = store.getState().house.events;
-  eq(ev.length, 1); eq(ev[0].salary, 0); eq(ev[0].name, "Unemployed");
+  eq(ev.length, 1); eq(ev[0].salary, 0); eq(ev[0].name, "Unemployed"); eq(ev[0].costs.groceries, 250);
   is($("#res-future").textContent.includes("cannot be covered"), "check flags the months: " + $("#res-future").textContent);
   $('[data-action="rm-event"]').click();
   eq(store.getState().house.events.length, 0);
@@ -168,6 +169,97 @@ test("house: an event needs a name and at least one change", () => {
   submit($("#event-form"));
   eq(store.getState().house.events.length, 0, "no change");
   is($("#ev-error").textContent.length > 0, "error shown");
+  // A salary change alone is not enough: cost changes are required.
+  type($("#ev-salary"), "0");
+  submit($("#event-form"));
+  eq(store.getState().house.events.length, 0, "salary alone is refused");
+  is($("#ev-error").textContent.includes("Cost changes are required"), "error says cost changes are required");
+});
+test("house: the cost changes box is marked as required", () => {
+  start("basic", house);
+  const box = $(".required-box");
+  is(!!box, "the cost changes box exists and is styled as required");
+  is(box.querySelector("legend").textContent.includes("Required"), "it says Required");
+  is(box.querySelector("legend strong"), "the heading is bold");
+  is(!box.closest("details"), "it is not tucked away in a collapsed panel");
+  is(!/optional/i.test(box.textContent), "nothing in it calls the costs optional");
+});
+test("house: the event form shows current expenses, per category, and the free money", () => {
+  start("basic", house);
+  const text = $("#ev-costs").textContent;
+  for (const w of ["Rent / mortgage", "Groceries", "Utilities & bills", "Total expenses"]) is(text.includes(w), "table lists " + w);
+  is(text.includes("€600") && text.includes("€300"), "current rent and groceries amounts shown");
+  const sum = $("#ev-summary").textContent;
+  is(sum.includes("a month free"), "free money shown: " + sum);
+  is(sum.includes("how much you can add to spending"), "explains it is the room to increase spending");
+});
+test("house: typing cost changes shows the change per category and what is left", () => {
+  start("basic", house);
+  type($("#ev-cost-groceries"), "400");
+  is($("#ev-diff-groceries").textContent.includes("+€100"), "groceries +100: " + $("#ev-diff-groceries").textContent);
+  is($("#ev-diff-total").textContent.includes("+€100"), "total +100");
+  is($("#ev-summary").textContent.includes("still have"), "within free money");
+  type($("#ev-cost-groceries"), "5000");
+  is($("#ev-summary").textContent.includes("short by"), "too much spending is flagged: " + $("#ev-summary").textContent);
+  type($("#ev-cost-groceries"), "300");
+  is($("#ev-diff-groceries").textContent.includes("no change"), "same amount is no change");
+});
+test("house: a higher event salary adds to the room, a lower one takes from it", () => {
+  start("basic", house);
+  type($("#ev-cost-groceries"), "300");
+  type($("#ev-salary"), "1000");
+  is($("#ev-summary").textContent.includes("short by"), "a salary drop with unchanged costs leaves the budget short");
+  type($("#ev-salary"), "3000");
+  is($("#ev-summary").textContent.includes("still have"), "a raise leaves room");
+});
+test("house: choosing another start month refreshes the current expenses and keeps what was typed", () => {
+  start("basic", house);
+  // A cost step already raises groceries from this month on.
+  type($("#cs-amount"), "450"); commit($("#cs-cat"), "groceries"); commit($("#cs-from"), plus(10)); submit($("#cost-step-form"));
+  is($("#ev-costs").textContent.includes("€300"), "before the step groceries are 300");
+  type($("#ev-cost-utilities"), "200");
+  commit($("#ev-start"), plus(12));
+  is($("#ev-costs").textContent.includes("€450"), "after the step groceries are 450: " + $("#ev-costs").textContent.slice(0, 200));
+  eq($("#ev-cost-utilities").value, "200", "typed value kept");
+});
+test("house: an event with cost changes is saved with them", () => {
+  start("basic", house);
+  type($("#ev-name"), "Family starts");
+  commit($("#ev-start"), plus(30));
+  type($("#ev-cost-groceries"), "500");
+  type($("#ev-cost-utilities"), "170");
+  submit($("#event-form"));
+  const ev = store.getState().house.events[0];
+  eq(ev.name, "Family starts"); eq(ev.costs.groceries, 500); eq(ev.costs.utilities, 170);
+});
+
+/* ---- age and the view until 65 ---- */
+test("house: the age can be entered, is saved, and can be cleared", () => {
+  start("basic", house);
+  eq(store.getState().house.age, null);
+  type($("#f-age"), "31");
+  eq(store.getState().house.age, 31);
+  type($("#f-age"), "");
+  eq(store.getState().house.age, null, "cleared");
+  type($("#f-age"), "70");
+  eq(store.getState().house.age, null, "70 is refused");
+  eq($("#f-age").getAttribute("aria-invalid"), "true");
+});
+test("overview: without an age it asks for one; with an age it runs until 65 and shows net worth", () => {
+  start("basic", overview);
+  is($("main, div").textContent.includes("Add your age"), "asks for the age");
+  const rowsWithout = $$(".data-table tbody tr").length;
+  const st = buildSample("basic"); st.house.age = 30;
+  localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load();
+  stage.innerHTML = ""; overview.render(stage);
+  const rowsWith = $$(".data-table tbody tr").length;
+  is(rowsWith > rowsWithout + 10, `many more years with an age: ${rowsWithout} -> ${rowsWith}`);
+  const lastYear = Number($(".data-table tbody tr:last-child th").textContent.slice(0, 4));
+  eq(lastYear, new Date().getFullYear() + 35, "last row is the year the user turns 65");
+  is($(".data-table thead").textContent.includes("Net worth"), "net worth column");
+  is($(".data-table thead").textContent.includes("Home"), "home column");
+  is(stage.textContent.includes("Net worth at 65"), "net worth at 65 shown");
+  is(!stage.textContent.includes("Add your age in the House Planner"), "the hint is gone once the age is known");
 });
 test("house: editing the price changes the cash needed and the deposit date", () => {
   start("basic", house);

@@ -9,9 +9,9 @@ import { currentMonth, duration } from "../components/format.js";
 import { mountChart, chartFigure, baseOptions } from "../components/chart.js";
 import * as store from "../store.js";
 import { addMonths, isMonthKey, monthsBetween } from "../calc/budget.js";
-import { approvedGoals } from "../calc/goals.js";
+import { approvedGoals, goalLinesFor } from "../calc/goals.js";
 import { AFFORD_OK, AFFORD_MAX } from "../calc/loan.js";
-import { inputFromState, prepare, project, loanFigures, supportSweep, todayFactor, loanMonths } from "../calc/projection.js";
+import { inputFromState, prepare, project, loanFigures, supportSweep, todayFactor, loanMonths, RENT_CATEGORY, RETIREMENT_AGE } from "../calc/projection.js";
 
 const get = (obj, path) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
 const set = (obj, path, v) => {
@@ -30,6 +30,8 @@ export function render(root) {
   const catName = (c) => (c.builtin ? t("cat." + c.id) : c.name);
   let unmountCharts = [];
   let chartTimer = null;
+  let lastA = null; // the latest calculation, used by the life-event form
+  let evCtx = null; // what the life-event form shows: expenses and free money in the event's first month
 
   /* ---------- calculation ---------- */
 
@@ -74,9 +76,79 @@ export function render(root) {
   const note = (kind, iconName, html) => `<div class="note ${kind}">${icon(iconName, { size: 18 })}<p>${html}</p></div>`;
   const table = (heads, rows) => `<table class="data-table"><thead><tr>${heads.map((h, i) => `<th scope="col"${i ? ' class="num"' : ""}>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, i) => (i ? `<td class="num">${c}</td>` : `<th scope="row">${c}</th>`)).join("")}</tr>`).join("")}</tbody></table>`;
 
+  /* ---------- Life event form: current expenses and room to grow ---------- */
+
+  /** Expenses, salary and free money in the month an event would start. */
+  function eventContext(a, startKey) {
+    const idx = Math.max(0, Math.min(a.prep.H - 1, monthsBetween(a.inp.start, isMonthKey(startKey) ? startKey : a.inp.start)));
+    const key = a.prep.keys[idx];
+    const row = a.r.rows.find((r) => r.key === key);
+    const salary = a.prep.salary[idx];
+    const leftover = row ? row.leftover : salary - a.prep.spend[idx] - goalLinesFor(a.inp.goals, key).total;
+    const amounts = {};
+    a.prep.categoryIds.forEach((c, k) => { amounts[c] = a.prep.amounts[idx][k]; });
+    return { key, salary, leftover, owns: row ? row.owns : false, amounts, total: a.prep.spend[idx], withInstallment: Boolean(row && row.owns) };
+  }
+
+  function eventCostsHtml(ctx, typed = {}) {
+    const rows = st().categories.map((c) => {
+      const cur = ctx.amounts[c.id] ?? 0;
+      const replaced = c.id === RENT_CATEGORY && ctx.owns;
+      const input = moneyInput({ id: `ev-cost-${c.id}`, value: typed[c.id] ?? "", ariaLabel: t("house.f.evNewFor", { cat: catName(c) }), className: "ev-new", placeholder: replaced ? "–" : String(Math.round(cur)), dataAttrs: `data-cur="${cur}" data-cat="${c.id}" ${replaced ? "disabled" : ""}` });
+      return `<tr>
+        <th scope="row"><span class="cat"><span class="cat-icon">${icon(c.icon)}</span>${esc(catName(c))}</span></th>
+        <td class="num">${replaced ? `<span class="small muted">${t("house.f.evRentReplaced")}</span>` : eur(cur)}</td>
+        <td class="num">${input}</td>
+        <td class="num" id="ev-diff-${c.id}">–</td>
+      </tr>`;
+    }).join("");
+    return `<div class="table-scroll" role="region" tabindex="0" aria-label="${t("house.f.evTableLabel")}">
+      <table class="data-table ev-table">
+        <caption class="visually-hidden">${t("house.f.evTableLabel")}</caption>
+        <thead><tr><th scope="col">${t("house.f.category")}</th><th scope="col" class="num">${t("house.f.evNow", { month: formatMonth(ctx.key) })}</th><th scope="col" class="num">${t("house.f.evNew")}</th><th scope="col" class="num">${t("house.f.evChange")}</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><th scope="row">${t("house.f.evTotal")}</th><td class="num">${eur(ctx.total)}</td><td class="num"></td><td class="num" id="ev-diff-total">–</td></tr></tfoot>
+      </table></div>`;
+  }
+
+  /** Live lines under the table: how much the event adds to spending and what is left afterwards. */
+  function updateEventSummary() {
+    if (!evCtx || !$("#ev-summary")) return;
+    let delta = 0, any = false;
+    for (const el of wrap.querySelectorAll(".ev-new")) {
+      const v = parseAmount(el.value);
+      const cell = $(`#ev-diff-${el.dataset.cat}`);
+      if (v === null || Number.isNaN(v) || el.disabled) { if (cell) cell.textContent = "–"; continue; }
+      const d = v - Number(el.dataset.cur);
+      delta += d; any = true;
+      if (cell) cell.textContent = Math.abs(d) < 0.005 ? t("house.f.evSame") : `${d > 0 ? "+" : "−"}${eur(Math.abs(d))}`;
+    }
+    const sal = parseAmount($("#ev-salary") ? $("#ev-salary").value : "");
+    const salaryChange = sal !== null && !Number.isNaN(sal) ? sal - evCtx.salary : 0;
+    const after = evCtx.leftover + salaryChange - delta;
+    $("#ev-diff-total").textContent = any ? `${delta > 0.005 ? "+" : delta < -0.005 ? "−" : ""}${eur(Math.abs(delta))}` : "–";
+    const month = formatMonth(evCtx.key);
+    const what = evCtx.withInstallment ? t("house.f.evFreeInst") : t("house.f.evFree");
+    const room = `<p>${t("house.f.evRoom", { month, free: eur(Math.max(0, evCtx.leftover)), what })}</p>`;
+    const verdict = !any && salaryChange === 0 ? `<p class="muted">${t("house.f.evTypeHint")}</p>`
+      : after >= -0.005 ? `<div class="note note-ok">${icon("circle-check", { size: 18 })}<p>${t("house.f.evOk", { left: eur(Math.max(0, after)) })}</p></div>`
+      : `<div class="note note-warn">${icon("triangle-alert", { size: 18 })}<p>${t("house.f.evShort", { short: eur(-after) })}</p></div>`;
+    $("#ev-summary").innerHTML = room + verdict;
+  }
+
+  /** Rebuilds the cost table for a new start month, keeping what the user already typed. */
+  function rebuildEventCosts() {
+    if (!lastA) return;
+    const typed = {};
+    wrap.querySelectorAll(".ev-new").forEach((el) => { if (el.value !== "") typed[el.dataset.cat] = el.value; });
+    evCtx = eventContext(lastA, $("#ev-start").value.trim());
+    $("#ev-costs").innerHTML = eventCostsHtml(evCtx, typed);
+    updateEventSummary();
+  }
+
   /* ---------- Your expected future ---------- */
 
-  function futureHtml() {
+  function futureHtml(a) {
     const s = st(), h = s.house;
     const start = s.settings.startMonth;
     const cats = s.categories;
@@ -96,8 +168,8 @@ export function render(root) {
       }).join("")}</ul>`
       : `<p class="small muted">${t("house.f.noEvents")}</p>`;
     const catOptions = cats.map((c) => `<option value="${c.id}">${esc(catName(c))}</option>`).join("");
-    const eventCosts = cats.map((c) => `<div class="field">${moneyInput({ id: `ev-cost-${c.id}`, label: catName(c), value: "", placeholder: "–" })}</div>`).join("");
     const nextMonth = addMonths(currentMonth() < start ? start : currentMonth(), 1);
+    evCtx = eventContext(a, nextMonth);
     return `
       <section class="card" aria-labelledby="future-h">
         <div class="card-head">${icon("calendar-clock")}<h2 id="future-h">${t("house.future.title")}</h2></div>
@@ -141,7 +213,12 @@ export function render(root) {
             ${monthField({ id: "ev-end", label: t("house.f.eventEnd"), value: "", min: start, hint: t("house.f.eventEndHint") })}
             <div class="field">${moneyInput({ id: "ev-salary", label: t("house.f.eventSalaryLabel"), value: "", placeholder: "–" })}<span class="hint">${t("house.f.eventSalaryHint")}</span></div>
           </div>
-          <details><summary>${t("house.f.eventCosts")}</summary><div class="form-row" style="margin-top:var(--space-3)">${eventCosts}</div></details>
+          <fieldset class="required-box" aria-describedby="ev-costs-help">
+            <legend><strong>${t("house.f.eventCosts")}</strong> <span class="badge badge-required">${t("house.f.required")}</span></legend>
+            <p id="ev-costs-help"><strong>${t("house.f.evHelpStrong")}</strong> ${t("house.f.evHelp")}</p>
+            <div id="ev-costs">${eventCostsHtml(evCtx)}</div>
+            <div id="ev-summary" class="stack" aria-live="polite"></div>
+          </fieldset>
           <p class="error" id="ev-error" role="alert"></p>
           <div><button class="btn" type="submit">${icon("plus", { size: 16 })}${t("house.f.addEvent")}</button></div>
         </form>
@@ -333,21 +410,29 @@ export function render(root) {
     const pick = (y) => (units === "today" ? y.real : y.nom);
     const yearsFromBuy = r.years.filter((y) => y.key >= r.purchase.slice(0, 4) + "-01");
     const all = r.years;
-    const tag = (y) => (y.key === r.debtFree ? `${y.year} ★` : String(y.year));
+    const dfYear = Number(r.debtFree.slice(0, 4));
+    const tag = (y) => (y.year === dfYear ? `${y.year} ★` : String(y.year));
     const unitLabel = units === "today" ? t("house.c.unitsTodayShort") : t("house.c.unitsFutureShort");
 
     const loanRows = yearsFromBuy.map((y) => [tag(y), eur(pick(y).loan), eur(pick(y).investments)]);
     const flowKeys = ["living", "goals", "installment", "invested", "toBank", "bonusSpent"];
-    const flowRows = all.map((y) => [String(y.year), ...flowKeys.map((k) => eur(pick(y)[k]))]);
+    const flowTable = ["pay", ...flowKeys];
+    const flowRows = all.map((y) => [String(y.year), ...flowTable.map((k) => eur(pick(y)[k]))]);
     const sweep = supportSweep(a.inp, a.prep, 30);
     const sweepType = a.h.support.type;
     const sweepRows = sweep.map((p) => [String(p.years), p.toDebtFree === null ? "–" : p.toDebtFree.toFixed(1)]);
 
-    box.innerHTML =
-      chartFigure({ id: "ch-loan", title: t("house.c.chartLoan"), summary: t("house.c.chartLoanSum", { unit: unitLabel, month: formatMonth(r.debtFree) }), tableLabel: t("house.c.showTable"),
+    const ageHint = a.h.age ? "" : `<div class="note">${icon("info", { size: 18 })}<p>${t("house.c.ageHint", { retire: RETIREMENT_AGE })}</p></div>`;
+    const loanSum = r.extended
+      ? t("house.c.chartLoanSumExt", { unit: unitLabel, month: formatMonth(r.debtFree), retire: RETIREMENT_AGE })
+      : t("house.c.chartLoanSum", { unit: unitLabel, month: formatMonth(r.debtFree) });
+    const flowSum = t(r.extended ? "house.c.chartFlowSumExt" : "house.c.chartFlowSum", { unit: unitLabel, retire: RETIREMENT_AGE });
+
+    box.innerHTML = ageHint +
+      chartFigure({ id: "ch-loan", title: t("house.c.chartLoan"), summary: loanSum, tableLabel: t("house.c.showTable"),
         tableHtml: table([t("house.c.colYear"), t("house.c.colLoan"), t("house.c.colPortfolio")], loanRows) }) +
-      chartFigure({ id: "ch-flow", title: t("house.c.chartFlow"), summary: t("house.c.chartFlowSum", { unit: unitLabel }), tableLabel: t("house.c.showTable"),
-        tableHtml: table([t("house.c.colYear"), ...flowKeys.map((k) => t("house.c.flow." + k))], flowRows) }) +
+      chartFigure({ id: "ch-flow", title: t("house.c.chartFlow"), summary: flowSum, tableLabel: t("house.c.showTable"),
+        tableHtml: table([t("house.c.colYear"), ...flowTable.map((k) => t("house.c.flow." + k))], flowRows) }) +
       chartFigure({ id: "ch-support", title: t("house.c.chartSupport"), summary: t("house.c.chartSupportSum", { type: t("house.c.sweep." + sweepType) }), tableLabel: t("house.c.showTable"),
         tableHtml: table([t("house.c.colSupportYears"), t("house.c.colToDebtFree")], sweepRows) });
 
@@ -366,7 +451,14 @@ export function render(root) {
       const opts = baseOptions(th, yMoney, { x: { stacked: true }, y: { stacked: true }, tip: eur });
       return {
         type: "bar",
-        data: { labels: all.map((y) => String(y.year)), datasets: flowKeys.map((k) => ({ label: t("house.c.flow." + k), data: all.map((y) => Math.round(pick(y)[k])), backgroundColor: c[k], stack: "s" })) },
+        data: {
+          labels: all.map((y) => String(y.year)),
+          datasets: [
+            ...flowKeys.map((k) => ({ type: "bar", label: t("house.c.flow." + k), data: all.map((y) => Math.round(pick(y)[k])), backgroundColor: c[k], stack: "s", order: 1 })),
+            // The line is the ceiling: what you earn in the year. The bars add up to it.
+            { type: "line", label: t("house.c.flow.pay"), data: all.map((y) => Math.round(pick(y).pay)), borderColor: th.text, backgroundColor: th.text, borderWidth: 2.5, borderDash: [3, 3], pointStyle: "triangle", pointRadius: 4, order: 0 },
+          ],
+        },
         options: opts,
       };
     }));
@@ -390,6 +482,7 @@ export function render(root) {
         <div class="form-row">
           <div class="field"><span class="label" id="units-l">${t("house.units.show")}</span><div class="row" role="group" aria-labelledby="units-l">${btn("future", t("house.units.future"))}${btn("today", t("house.units.today"))}</div></div>
           ${num("inflationPct", t("house.units.inflation"), { min: 0, max: 20, step: 0.1, unit: "%", hint: t("house.units.inflationHint") })}
+          ${num("age", t("house.units.age"), { min: 16, max: 64, step: 1, hint: t("house.units.ageHint", { retire: RETIREMENT_AGE }) })}
         </div>
         <p class="small muted">${t("house.units.note")}</p>
       </section>`;
@@ -401,12 +494,14 @@ export function render(root) {
     if (!s.settings.startMonth) {
       return `${head}<section class="card soon-card"><p>${t("house.needBudget")}</p><a class="btn btn-primary" href="#/budget">${t("house.needBudgetCta")}${icon("chevron-right")}</a></section>`;
     }
-    return `${head}<div class="stack-lg">${toolbarHtml()}${futureHtml()}${stageAHtml()}${stageBHtml()}${stageCHtml()}</div>`;
+    lastA = analyse();
+    return `${head}<div class="stack-lg">${toolbarHtml()}${futureHtml(lastA)}${stageAHtml()}${stageBHtml()}${stageCHtml()}</div>`;
   }
 
   function refresh() {
     if (!st().settings.startMonth) return;
     const a = analyse();
+    lastA = a;
     $("#res-future").innerHTML = futureResult(a);
     $("#res-a").innerHTML = stageAResult(a);
     $("#res-b").innerHTML = stageBResult(a);
@@ -423,6 +518,7 @@ export function render(root) {
       if (el.type !== "month") el.setAttribute("title", "YYYY-MM");
     });
     refresh();
+    updateEventSummary();
     if (focusSel) { const el = $(focusSel); if (el) el.focus(); }
   }
 
@@ -490,11 +586,15 @@ export function render(root) {
       if (Number.isNaN(salaryRaw)) return setError("#ev-error", t("house.f.errSalaryEvent"), "#ev-salary");
       const costs = {};
       for (const c of st().categories) {
+        if ($(`#ev-cost-${c.id}`).disabled) continue;
         const v = parseAmount($(`#ev-cost-${c.id}`).value);
         if (Number.isNaN(v)) return setError("#ev-error", t("house.f.errAmount"), `#ev-cost-${c.id}`);
         if (v !== null) costs[c.id] = v;
       }
-      if (salaryRaw === null && !Object.keys(costs).length) return setError("#ev-error", t("house.f.errNoChange"), "#ev-salary");
+      if (!Object.keys(costs).length) {
+        const first = wrap.querySelector(".ev-new:not(:disabled)");
+        return setError("#ev-error", t("house.f.errNoChange"), first ? `#${first.id}` : "#ev-salary");
+      }
       store.update((s) => {
         s.house.events.push({ id: store.newId(), name, start: startM, end: endRaw || null, salary: salaryRaw, costs });
         s.house.events.sort((x, y) => x.start.localeCompare(y.start));
@@ -505,8 +605,15 @@ export function render(root) {
 
   wrap.addEventListener("input", (e) => {
     const el = e.target;
+    if (el.classList.contains("ev-new") || el.id === "ev-salary") { updateEventSummary(); return; }
     const path = el.dataset.path;
     if (!path || el.type !== "number") return;
+    if (path === "age" && el.value.trim() === "") { // the age can be cleared
+      el.removeAttribute("aria-invalid");
+      store.update((x) => { x.house.age = null; });
+      refresh();
+      return;
+    }
     const v = parseAmount(el.value);
     if (v === null || Number.isNaN(v) || v < Number(el.min) || v > Number(el.max)) { el.setAttribute("aria-invalid", "true"); return; }
     el.removeAttribute("aria-invalid");
@@ -516,6 +623,7 @@ export function render(root) {
 
   wrap.addEventListener("change", (e) => {
     const el = e.target;
+    if (el.id === "ev-start") { rebuildEventCosts(); return; }
     if (el.dataset.path && el.type === "number") {
       el.removeAttribute("aria-invalid");
       el.value = get(st().house, el.dataset.path) ?? ""; // put back the last valid value if the entry was empty or out of range

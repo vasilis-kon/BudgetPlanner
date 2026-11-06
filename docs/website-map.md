@@ -1,6 +1,6 @@
 # BudgetPlanner — Website Map
 
-Last updated: 6 Nov 2026 · Source of truth for what the site does. Live version: https://claude.ai/artifact/S6yzuSjPv1yt2TUAdX2cDe
+Last updated: 6 Nov 2026 (retirement view, life-event cost changes and pay line added) · Source of truth for what the site does. Live version: https://claude.ai/artifact/S6yzuSjPv1yt2TUAdX2cDe
 
 ## Who it's for
 
@@ -106,7 +106,7 @@ Three stages in order, from first savings to a fully paid house. Each stage star
 The projection runs on the user's own expectations, not automatic growth:
 
 - **Salary steps:** expected raises or job changes, each a new net salary from a chosen month.
-- **Cost steps:** expected changes per expense category from a chosen month, for example groceries up when a family starts. Several changes can be grouped as one life event with a start and optional end, for example "Family starts, 2032" or "Unemployed, 4 months" (salary drops, then returns). The site gives no estimates: the user enters every number.
+- **Cost steps:** expected changes per expense category from a chosen month, for example groceries up when a family starts. Several changes can be grouped as one life event with a start and optional end, for example "Family starts, 2032" or "Unemployed, 4 months" (salary drops, then returns). The site gives no estimates: the user enters every number. **Cost changes are required for a life event** (a salary change alone is not enough). The form shows the user's current expenses per category for the event's first month and how much free money they have, so they can see how much spending can rise, and it updates live as they type.
 - Months with no step keep the last known salary and category amounts.
 - **Installment check:** after any step or life event, the site checks every month can still cover expenses and the installment, and flags the months that can't.
 
@@ -130,6 +130,8 @@ The projection runs on the user's own expectations, not automatic growth:
   - A working spouse or partner: fixed monthly contribution to investments (a safe minimum they can count on), start month (for example after the wedding), optional end.
 - Shows when the portfolio, after tax, can pay off the remaining loan, and the advantage of investing in today's money.
 - Charts: loan balance vs. portfolio, where the salary goes each year, years of support income vs. years to debt-free.
+- The "where the salary goes" chart draws a line for the year's total pay (14 salaries), the most that can be spent, so the user sees how close the bars come to it.
+- **Retirement view:** the user enters their age. The loan-vs-portfolio and pay charts then continue after debt-free until age 65, the retirement age in Greece. At debt-free the loan is paid off by selling part of the portfolio; after that there is no installment and the rest keeps growing.
 
 **Support income rules (decided)**
 
@@ -146,6 +148,7 @@ One view of where the user's money sits at the end of each year, from the first 
 - **Loan:** remaining balance.
 - A single timeline bar: saving the deposit, then loan plus investing, then debt-free.
 - Toggle between future euros and today's money, plus a year-by-year table.
+- **Net worth:** with the user's age known, the Overview runs until age 65. It adds the home (at its purchase price; the site assumes no price growth) and a net worth line: bank plus investments plus home, minus the loan.
 
 ## Not in this version
 

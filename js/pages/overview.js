@@ -5,7 +5,7 @@ import { currentMonth, duration } from "../components/format.js";
 import { mountChart, chartFigure, baseOptions } from "../components/chart.js";
 import * as store from "../store.js";
 import { monthsBetween } from "../calc/budget.js";
-import { inputFromState, prepare, project, loanMonths } from "../calc/projection.js";
+import { inputFromState, prepare, project, loanMonths, RETIREMENT_AGE } from "../calc/projection.js";
 
 export function render(root) {
   const wrap = document.createElement("div");
@@ -35,16 +35,18 @@ export function render(root) {
     const btn = (value, label) => `<button type="button" class="btn ${units === value ? "btn-primary" : ""}" data-units="${value}" aria-pressed="${units === value}">${label}</button>`;
 
     // One bar for the whole plan: saving, then loan plus investing, then debt-free.
-    const total = monthsBetween(r.start, r.debtFree) + 1;
     const saveMonths = monthsBetween(r.start, r.purchase);
-    const loanLen = total - saveMonths;
+    const loanLen = monthsBetween(r.purchase, r.debtFree) + 1;
+    const growMonths = r.extended ? monthsBetween(r.debtFree, r.endKey) : 0;
+    const total = saveMonths + loanLen + growMonths;
     const hereRaw = monthsBetween(r.start, today) / total;
     const here = Math.max(0, Math.min(1, hereRaw));
     const bar = `
       <div class="timeline-bar" style="--here:${here.toFixed(3)}">
         <div class="phase phase-save" style="flex:${Math.max(1, saveMonths)}"><strong>${t("overview.phaseSave")}</strong><span>${formatMonth(r.start)} – ${formatMonth(r.depositReady)}</span><span>${duration(saveMonths)}</span></div>
         <div class="phase phase-loan" style="flex:${Math.max(1, loanLen)}"><strong>${t("overview.phaseLoan")}</strong><span>${formatMonth(r.purchase)} – ${formatMonth(r.debtFree)}</span><span>${duration(loanLen)}</span></div>
-        <div class="phase phase-free"><strong>${icon("badge-check", { size: 18 })} ${t("overview.phaseFree")}</strong><span>${formatMonth(r.debtFree)}</span></div>
+        <div class="phase phase-free ${growMonths ? "phase-free-mid" : ""}"><strong>${icon("badge-check", { size: 18 })} ${t("overview.phaseFree")}</strong><span>${formatMonth(r.debtFree)}</span></div>
+        ${growMonths ? `<div class="phase phase-grow" style="flex:${Math.max(1, growMonths)}"><strong>${t("overview.phaseGrow", { retire: RETIREMENT_AGE })}</strong><span>${formatMonth(r.debtFree)} – ${formatMonth(r.endKey)}</span><span>${duration(growMonths)}</span></div>` : ""}
         ${hereRaw >= 0 && hereRaw <= 1 ? `<span class="here-pin" aria-hidden="true">${icon("map-pin", { size: 18 })}</span>` : ""}
       </div>
       <p class="small muted">${hereRaw < 0 ? t("overview.hereBefore", { month: formatMonth(r.start) }) : hereRaw > 1 ? t("overview.hereAfter") : t("overview.here", { month: formatMonth(today), pct: Math.round(here * 100) })}</p>`;
@@ -55,16 +57,19 @@ export function render(root) {
       <div class="stat"><dt>${t("overview.sBuy")}</dt><dd>${formatMonth(r.purchase)}</dd></div>
       <div class="stat"><dt>${t("overview.sFree")}</dt><dd>${formatMonth(r.debtFree)}</dd><dd class="sub">${t("overview.sFreeSub", { time: duration(loanMonths(r)) })}</dd></div>
       <div class="stat"><dt>${t("overview.sLeft")}</dt><dd>${eur(units === "today" ? info.surplusReal : info.surplus)}</dd><dd class="sub">${t("overview.sLeftSub")}</dd></div>
+      <div class="stat"><dt>${t(r.extended ? "overview.sWorthAge" : "overview.sWorth", { retire: RETIREMENT_AGE })}</dt><dd>${eur(pick(r.years[r.years.length - 1]).netWorth)}</dd><dd class="sub">${t("overview.sWorthSub", { month: formatMonth(r.endKey) })}</dd></div>
     </dl>`;
+    const ageHint = s.house.age ? "" : `<div class="note" style="margin-top:var(--space-3)">${icon("info", { size: 18 })}<p>${t("overview.ageHint", { retire: RETIREMENT_AGE })} <a href="#/house">${t("overview.ageLink")}</a></p></div>`;
 
     const years = r.years;
-    const label = (y) => (y.key === r.debtFree ? t("overview.lastYear", { year: y.year, month: formatMonth(y.key).split(" ")[0] }) : String(y.year));
+    const dfYear = Number(r.debtFree.slice(0, 4));
+    const label = (y) => (y.year === dfYear ? t("overview.lastYear", { year: y.year, month: formatMonth(r.debtFree).split(" ")[0] }) : String(y.year));
     const rows = years.map((y) => {
       const v = pick(y);
-      return `<tr><th scope="row">${label(y)}</th><td class="num">${eur(v.depositSavings)}</td><td class="num">${eur(v.buffer)}</td><td class="num">${eur(v.goalFunds)}</td><td class="num">${eur(v.unspent)}</td><td class="num">${eur(v.investments)}</td><td class="num">${eur(v.loan)}</td></tr>`;
+      return `<tr><th scope="row">${label(y)}</th><td class="num">${eur(v.depositSavings)}</td><td class="num">${eur(v.buffer)}</td><td class="num">${eur(v.goalFunds)}</td><td class="num">${eur(v.unspent)}</td><td class="num">${eur(v.investments)}</td><td class="num">${eur(v.home)}</td><td class="num">${eur(v.loan)}</td><td class="num"><strong>${eur(v.netWorth)}</strong></td></tr>`;
     }).join("");
     const tableHtml = `<table class="data-table">
-      <thead><tr><th scope="col">${t("overview.colYear")}</th><th scope="col" class="num">${t("overview.colDeposit")}</th><th scope="col" class="num">${t("overview.colBuffer")}</th><th scope="col" class="num">${t("overview.colFunds")}</th><th scope="col" class="num">${t("overview.colUnspent")}</th><th scope="col" class="num">${t("overview.colInvest")}</th><th scope="col" class="num">${t("overview.colLoan")}</th></tr></thead>
+      <thead><tr><th scope="col">${t("overview.colYear")}</th><th scope="col" class="num">${t("overview.colDeposit")}</th><th scope="col" class="num">${t("overview.colBuffer")}</th><th scope="col" class="num">${t("overview.colFunds")}</th><th scope="col" class="num">${t("overview.colUnspent")}</th><th scope="col" class="num">${t("overview.colInvest")}</th><th scope="col" class="num">${t("overview.colHome")}</th><th scope="col" class="num">${t("overview.colLoan")}</th><th scope="col" class="num">${t("overview.colNetWorth")}</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
     const unitLabel = units === "today" ? t("house.c.unitsTodayShort") : t("house.c.unitsFutureShort");
 
@@ -80,14 +85,15 @@ export function render(root) {
           <h2 id="ov-bar">${t("overview.barTitle")}</h2>
           ${bar}
           ${stats}
+          ${ageHint}
         </section>
         <section class="card" aria-labelledby="ov-chart">
           <h2 id="ov-chart">${t("overview.chartTitle")}</h2>
-          ${chartFigure({ id: "ch-ov", title: t("overview.chartCaption"), summary: t("overview.chartSum", { unit: unitLabel }), tableLabel: "", tableHtml: null, height: 380 })}
+          ${chartFigure({ id: "ch-ov", title: t("overview.chartCaption"), summary: t("overview.chartSum", { unit: unitLabel, retire: RETIREMENT_AGE }), tableLabel: "", tableHtml: null, height: 380 })}
         </section>
         <section class="card" aria-labelledby="ov-table">
           <h2 id="ov-table">${t("overview.tableTitle")}</h2>
-          <p class="small muted">${t("overview.tableNote", { unit: unitLabel })}</p>
+          <p class="small muted">${t(r.extended ? "overview.tableNoteExt" : "overview.tableNote", { unit: unitLabel, retire: RETIREMENT_AGE })}</p>
           <div class="table-scroll" role="region" tabindex="0" aria-label="${t("overview.tableTitle")}">${tableHtml}</div>
         </section>
       </div>`;
@@ -106,6 +112,8 @@ export function render(root) {
             column("overview.colFunds", "goalFunds", th.fund),
             column("overview.colUnspent", "unspent", th.living),
             column("overview.colInvest", "investments", th.invest),
+            column("overview.colHome", "home", th.installment),
+            { type: "line", label: t("overview.colNetWorth"), data: years.map((y) => Math.round(pick(y).netWorth)), borderColor: th.text, backgroundColor: th.text, borderWidth: 3, pointStyle: "triangle", pointRadius: 4, order: 0 },
             { type: "line", label: t("overview.colLoan"), data: years.map((y) => (y.key >= r.purchase ? Math.round(pick(y).loan) : null)), borderColor: th.loan, backgroundColor: th.loan, borderDash: [7, 4], borderWidth: 2.5, pointStyle: "rectRot", pointRadius: 4, order: 1 },
           ],
         },

@@ -317,7 +317,93 @@ test("saved money from the deposit stage: purchase pays down payment and costs f
   near(after.buffer, 5000, 400, "buffer remains after purchase");
 });
 
+/* ---------- retirement view (until age 65), pay line and net worth ---------- */
+import { retirementKey } from "../js/calc/projection.js";
+
+const withAge = (age) => { const st = baseState(); st.house.age = age; return st; };
+test("retirement key: age 30 means 35 years from today; 65 or unknown means none", () => {
+  eq(retirementKey(TODAY, 30), addMonths(TODAY, 35 * 12));
+  eq(retirementKey(TODAY, 64), addMonths(TODAY, 12));
+  eq(retirementKey(TODAY, 65), null); eq(retirementKey(TODAY, null), null);
+});
+test("with an age, the projection runs on after debt-free until the user is 65", () => {
+  const r = run(withAge(30));
+  is(r.extended, "should be extended");
+  eq(r.endKey, addMonths(TODAY, 35 * 12));
+  eq(r.retireKey, r.endKey);
+  is(r.rows.length === monthsBetween(TODAY, r.endKey) + 1, "one row for every month until 65, got " + r.rows.length);
+  eq(r.years[r.years.length - 1].key, r.endKey);
+});
+test("without an age the projection still stops at debt-free", () => {
+  const r = run(baseState());
+  eq(r.extended, false); eq(r.endKey, r.debtFree);
+});
+test("the debt-free date is the same with or without the age", () => {
+  const a = run(baseState()), b = run(withAge(30));
+  eq(b.debtFree, a.debtFree); eq(b.purchase, a.purchase); eq(b.depositReady, a.depositReady);
+});
+test("after debt-free: no loan, no installment, and the portfolio keeps growing", () => {
+  const r = run(withAge(30));
+  const after = r.rows.filter((x) => x.key > r.debtFree);
+  is(after.length > 100, "many months after debt-free");
+  is(after.every((x) => x.loan === 0 && x.installment === 0), "loan and installment must be zero");
+  is(after[after.length - 1].investments > after[0].investments, "portfolio must grow");
+});
+test("paying the loan off from the portfolio keeps net worth steady (no money appears or vanishes)", () => {
+  const r = run(withAge(30));
+  const at = r.rows.findIndex((x) => x.key === r.debtFree);
+  const before = r.rows[at], next = r.rows[at + 1];
+  is(Math.abs(next.netWorth - before.netWorth) < 2500, `net worth ${Math.round(before.netWorth)} -> ${Math.round(next.netWorth)}`);
+  is(next.investments < before.investments, "the portfolio paid the loan");
+});
+test("after payoff the monthly leftover is the full free money, now without the installment", () => {
+  const r = run(withAge(30));
+  const post = r.rows.find((x) => x.key === addMonths(r.debtFree, 2));
+  near(post.leftover, 2000 - 300 - 120, 0.01, "salary - groceries - home costs");
+});
+test("net worth drops by the purchase costs when the house is bought, nothing else", () => {
+  const r = run(baseState());
+  const before = r.rows.find((x) => x.key === r.depositReady), buy = r.rows.find((x) => x.key === r.purchase);
+  const drop = before.netWorth - buy.netWorth;
+  is(drop > 9000 && drop < 12500, "purchase costs are 10,500, drop was " + Math.round(drop));
+});
+test("the home counts at its purchase price from the month it is bought", () => {
+  const r = run(baseState());
+  eq(r.rows.find((x) => x.key === r.depositReady).home, 0);
+  eq(r.rows.find((x) => x.key === r.purchase).home, 150000);
+});
+test("yearly pay is 12 salaries plus the three bonuses (14 salaries) in a full year", () => {
+  const r = run(baseState());
+  const y = r.years.find((x) => x.year === 2028);
+  near(y.nom.pay, 2000 * 14, 0.01, "2000 x 14");
+  const sum = y.nom.living + y.nom.goals + y.nom.installment + y.nom.invested + y.nom.toBank + y.nom.bonusSpent;
+  near(sum, y.nom.pay, 0.01, "the bars add up to the pay line");
+});
+test("pay line follows salary steps", () => {
+  const st = withAge(30); st.house.salarySteps = [{ id: "s1", from: "2029-01", amount: 2500 }];
+  const r = run(st);
+  near(r.years.find((x) => x.year === 2029).nom.pay, 2500 * 14, 0.01);
+});
+test("per-category amounts for the life-event form: current amounts and total agree", () => {
+  const prep = prepare(inputFromState(baseState(), TODAY));
+  const i = 5;
+  near(prep.amounts[i].reduce((a, b) => a + b, 0), prep.spend[i], 1e-9);
+  eq(prep.categoryIds.length, prep.amounts[i].length);
+  eq(prep.amounts[i][prep.categoryIds.indexOf("rent")], 600);
+});
+test("in today's euros the retirement-year net worth is smaller than in future euros", () => {
+  const r = run(withAge(30));
+  const last = r.years[r.years.length - 1];
+  is(last.real.netWorth < last.nom.netWorth, "deflated value must be smaller");
+});
+
 /* ---------- saved data ---------- */
+test("age is kept when valid and dropped when not", () => {
+  const st = baseState();
+  const ok = JSON.parse(JSON.stringify(st)); ok.house.age = 34;
+  eq(sanitize(ok).house.age, 34);
+  for (const bad of [70, 12, "x", -3]) { const b = JSON.parse(JSON.stringify(st)); b.house.age = bad; eq(sanitize(b).house.age, null, "age " + bad); }
+});
 test("a fresh state survives a save and load unchanged", () => {
   const st = baseState();
   const back = sanitize(JSON.parse(JSON.stringify(st)));
@@ -424,7 +510,7 @@ const lookup = (path) => path.split(".").reduce((o, k) => (o == null ? o : o[k])
   }
   // Keys built at run time
   for (const k of ["ok", "tight", "over"]) if (lookup("house.b.afford." + k) === undefined) missing.push("house.b.afford." + k);
-  for (const k of ["living", "goals", "installment", "invested", "toBank", "bonusSpent"]) if (lookup("house.c.flow." + k) === undefined) missing.push("house.c.flow." + k);
+  for (const k of ["pay", "living", "goals", "installment", "invested", "toBank", "bonusSpent"]) if (lookup("house.c.flow." + k) === undefined) missing.push("house.c.flow." + k);
   for (const k of ["room", "partner"]) if (lookup("house.c.sweep." + k) === undefined) missing.push("house.c.sweep." + k);
   for (const k of ["deposit", "loan", "invest"]) if (lookup("goals.f.to_" + k) === undefined) missing.push("goals.f.to_" + k);
   for (const k of ["rent", "groceries", "utilities", "transport", "health", "eating", "subscriptions", "leisure", "clothing", "other"]) if (lookup("cat." + k) === undefined) missing.push("cat." + k);

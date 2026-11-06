@@ -17,8 +17,8 @@ The full specification is in [docs/website-map.md](docs/website-map.md).
 | Home | Your roadmap: goals, life events, deposit ready, house purchase, end of the fixed-rate period and debt-free on one timeline, with a "you are here" marker. Each step opens the page it belongs to. |
 | Monthly Budget | Salary (changes apply from a chosen month), categories with icons, planned vs. actual, bonus share, free money, and the lines approved goals add. |
 | Goals | Any number of goals. Each is checked against free money, shows how it moves the deposit date, and joins the budget once approved. |
-| House Planner | Your expected future (salary steps, cost steps, life events, installment check), then Stage A save the deposit, Stage B size the loan, Stage C invest until debt-free, with charts. |
-| Overview | Bank, investments and loan at the end of each year, one timeline bar, and a year-by-year table. |
+| House Planner | Your expected future (salary steps, cost steps, life events with required cost changes, installment check), then Stage A save the deposit, Stage B size the loan, Stage C invest until debt-free, with charts. Enter your age and the charts run until 65. |
+| Overview | Bank, investments, home, loan and net worth at the end of each year (until 65 once you enter your age), one timeline bar, and a year-by-year table. |
 
 The plan ends when you are debt-free: the month your investments, after tax on gains, cover what is still owed on the loan.
 

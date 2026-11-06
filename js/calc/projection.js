@@ -16,6 +16,12 @@ import { createLoan, loanSummary, affordability, loanForPayment, AFFORD_OK, AFFO
 export const HORIZON = 600; // months simulated from the plan start (50 years)
 const EPS = 0.005;
 export const RENT_CATEGORY = "rent";
+export const RETIREMENT_AGE = 65; // retirement age in Greece: the net worth view runs until then
+
+/** The month the user turns 65, or null if their age is not known. */
+export function retirementKey(today, age) {
+  return age > 0 && age < RETIREMENT_AGE ? addMonths(today, (RETIREMENT_AGE - age) * 12) : null;
+}
 
 /** Everything the projection needs, taken from the saved state. */
 export function inputFromState(st, today) {
@@ -28,6 +34,7 @@ export function inputFromState(st, today) {
     bonusSharePct: st.settings.bonusSharePct,
     goals: approvedGoals(st.goals),
     house: st.house,
+    endKey: retirementKey(today, st.house.age), // keep going after debt-free until this month (age 65)
   };
 }
 
@@ -57,7 +64,7 @@ const eventActive = (e, key) => e.start <= key && (e.end === null || key < e.end
  */
 export function prepare(inp) {
   const { start, today, salarySteps, categoryIds, months, house } = inp;
-  const H = inp.horizon || HORIZON;
+  const H = inp.horizon || Math.max(HORIZON, inp.endKey ? monthsBetween(start, inp.endKey) + 1 : 0);
   const keys = new Array(H);
   for (let i = 0; i < H; i++) keys[i] = addMonths(start, i);
 
@@ -66,7 +73,7 @@ export function prepare(inp) {
   const stepsByCat = {};
   for (const s of [...(house.costSteps || [])].sort((a, b) => a.from.localeCompare(b.from))) (stepsByCat[s.catId] ||= []).push(s);
 
-  const salary = new Array(H), spend = new Array(H), rent = new Array(H);
+  const salary = new Array(H), spend = new Array(H), rent = new Array(H), amounts = new Array(H);
   for (let i = 0; i < H; i++) {
     const key = keys[i];
     const active = events.filter((e) => eventActive(e, key));
@@ -75,6 +82,7 @@ export function prepare(inp) {
     salary[i] = s;
 
     let total = 0, rentAmt = 0;
+    const each = [];
     for (const c of categoryIds) {
       let amount;
       const actual = key <= today ? actualFor(months, c, key) : null;
@@ -89,12 +97,14 @@ export function prepare(inp) {
         for (const e of active) if (e.costs && e.costs[c] !== undefined) amount = e.costs[c];
       }
       total += amount;
+      each.push(amount);
       if (c === RENT_CATEGORY) rentAmt = amount;
     }
     spend[i] = total;
     rent[i] = rentAmt;
+    amounts[i] = each; // per category, in the order of categoryIds
   }
-  return { H, keys, salary, spend, rent };
+  return { H, keys, salary, spend, rent, amounts, categoryIds };
 }
 
 /** Joins runs of consecutive months with the same kind into ranges. */
@@ -111,7 +121,7 @@ function groupProblems(flags) {
   return out;
 }
 
-const ZERO_FLOWS = () => ({ living: 0, goals: 0, installment: 0, invested: 0, toBank: 0, bonusSpent: 0, support: 0 });
+const ZERO_FLOWS = () => ({ pay: 0, living: 0, goals: 0, installment: 0, invested: 0, toBank: 0, bonusSpent: 0, support: 0 });
 
 /**
  * Runs the plan. Returns the key dates (deposit ready, purchase, fixed period end, debt-free), year-end
@@ -125,7 +135,7 @@ export function project(inp, prep = prepare(inp)) {
   const out = {
     fin, start: inp.start, today, rows: [], years: [], problems: [],
     depositReady: null, purchase: null, fixedEnd: null, termEnd: null, debtFree: null, debtFreeReason: null,
-    endKey: null, debtFreeInfo: null, loanFirstInstallment: null, loanLaterInstallment: null,
+    endKey: null, retireKey: inp.endKey || null, extended: false, debtFreeInfo: null, loanFirstInstallment: null, loanLaterInstallment: null,
     salaryAtPurchase: null, paybackFallbacks: [],
   };
   if (!fin.ok) return out;
@@ -149,6 +159,7 @@ export function project(inp, prep = prepare(inp)) {
     const snap = (k) => ({
       depositSavings: row.depositSavings * k, buffer: row.buffer * k, goalFunds: row.goalFunds * k,
       unspent: row.unspent * k, bank: row.bank * k, investments: row.investments * k, loan: row.loan * k,
+      home: row.home * k, netWorth: row.netWorth * k,
     });
     out.years.push({ year: Number(row.key.slice(0, 4)), key: row.key, nom: { ...snap(1), ...yearFlows }, real: { ...snap(f), ...yearFlowsReal } });
     yearFlows = ZERO_FLOWS(); yearFlowsReal = ZERO_FLOWS();
@@ -208,10 +219,12 @@ export function project(inp, prep = prepare(inp)) {
       }
       spendNow = spendNow - prep.rent[i] + house.loan.homeCosts;
       const firstMonth = key === out.purchase;
-      const step = loan.step(payLoan + (firstMonth ? pendingLoanPrepay : 0));
-      if (firstMonth) pendingLoanPrepay = 0;
-      if (out.loanLaterInstallment === null && loan.terms.mixed && step.k === loan.terms.fixedMonths + 1) out.loanLaterInstallment = step.installment;
-      installment = step.payment; interest = step.interest;
+      if (loan) { // after debt-free the loan is gone and there is no installment
+        const step = loan.step(payLoan + (firstMonth ? pendingLoanPrepay : 0));
+        if (firstMonth) pendingLoanPrepay = 0;
+        if (out.loanLaterInstallment === null && loan.terms.mixed && step.k === loan.terms.fixedMonths + 1) out.loanLaterInstallment = step.installment;
+        installment = step.payment; interest = step.interest;
+      }
       if (sup.on && sup.type === "room" && monthsBetween(out.purchase, key) < sup.years * 12) {
         room = (sup.rent * (12 - sup.emptyMonths)) / 12 * (1 - sup.taxPct / 100);
       }
@@ -230,22 +243,26 @@ export function project(inp, prep = prepare(inp)) {
     const afterTax = P - Math.max(0, P - basis) * taxRate;
     const goalFunds = [...funds.values()].reduce((a, b) => a + b, 0);
     const bufferNow = owns ? Math.min(fin.buffer, Math.max(0, cash)) : 0;
+    const home = owns ? fin.price : 0; // the home at its purchase price: the site assumes no growth
+    const loanBalance = loan ? loan.balance : 0;
     const row = {
       key, salary, bonus, spend: spendNow, goalContrib, ongoing, installment, interest, leftover,
       depositSavings: owns ? 0 : cash, buffer: bufferNow, unspent: owns ? cash - bufferNow : 0, goalFunds,
-      bank: cash + goalFunds, investments: afterTax, gross, loan: loan ? loan.balance : 0, owns,
+      bank: cash + goalFunds, investments: afterTax, gross, loan: loanBalance, owns,
+      home, netWorth: cash + goalFunds + afterTax + home - loanBalance,
     };
     out.rows.push(row);
 
     // Where this month's pay went. Salary and bonus together equal these parts (paybacks and support income are extra).
     const flow = {
-      living: spendNow + ongoing, goals: goalContrib, installment, invested: investedSalary,
+      pay: salary + bonus, living: spendNow + ongoing, goals: goalContrib, installment, invested: investedSalary,
       toBank, bonusSpent, support: partner + room,
     };
     for (const k of Object.keys(yearFlows)) { yearFlows[k] += flow[k]; yearFlowsReal[k] += flow[k] * fac; }
 
     // Debt-free: the loan is gone, or the portfolio after tax covers what is still owed.
-    if (owns) {
+    const keepGoing = () => Boolean(inp.endKey) && key < inp.endKey; // carry on until age 65 after debt-free
+    if (owns && loan) {
       const paidOff = loan.balance < EPS;
       if (paidOff || afterTax >= loan.balance) {
         out.debtFree = key;
@@ -261,11 +278,18 @@ export function project(inp, prep = prepare(inp)) {
           balance: loan.balance, portfolioAfterTax: afterTax, surplus: afterTax - loan.balance,
           surplusReal: (afterTax - loan.balance) * fac, interestAvoided: remaining, interestAvoidedReal: remainingReal,
         };
+        if (keepGoing()) {
+          // Pay the loan off by selling just enough of the portfolio; from next month there is no installment.
+          if (!paidOff && afterTax > 0) { const sold = loan.balance / afterTax; P -= P * sold; basis -= basis * sold; }
+          loan = null;
+          out.extended = true;
+        }
       }
     }
 
-    if (month === 12 || out.debtFree !== null || i === H - 1) pushYear(row);
-    if (out.debtFree !== null) break;
+    const finished = out.debtFree !== null && !keepGoing();
+    if (month === 12 || finished || i === H - 1) pushYear(row);
+    if (finished) break;
   }
 
   out.endKey = out.rows.length ? out.rows[out.rows.length - 1].key : null;

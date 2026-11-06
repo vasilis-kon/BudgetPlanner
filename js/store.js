@@ -29,6 +29,7 @@ export function defaultHouse() {
     loan: { type: "fixed", termYears: 20, rate: 4.2, fixedYears: 5, fixedRate: 3.5, variableRate: 4.5, homeCosts: 120 },
     invest: { sharePct: 50, returnPct: 8, feePct: 0.07, taxPct: 15 },
     support: { on: false, type: "room", rent: 400, emptyMonths: 1, taxPct: 15, years: 20, partnerAmount: 300, partnerStart: null, partnerEnd: null },
+    age: null, // the user's age today; the charts run until 65 (retirement in Greece) once it is known
     inflationPct: 2.5, // only used to show amounts in today's euros
     units: "future", // "future" or "today"
     salarySteps: [], // [{ id, from, amount }] expected new net salary from a month
@@ -176,6 +177,7 @@ export function sanitizeHouse(raw, validCats) {
     partnerStart: ps,
     partnerEnd: ps && pe && pe > ps ? pe : null,
   };
+  d.age = num(h.age) && h.age >= 16 && h.age < 65 ? Math.round(h.age) : null;
   d.inflationPct = clamp(h.inflationPct, 0, 20, d.inflationPct);
   d.units = h.units === "today" ? "today" : "future";
   d.salarySteps = stepList(h.salarySteps, (x) =>

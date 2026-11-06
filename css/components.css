@@ -238,3 +238,16 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 999px; 
 .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
 .btn-primary:disabled { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
 .btn:disabled:hover { background: var(--surface-2); }
+
+/* Life-event cost changes: required, so it stands out */
+.required-box { border: 2px solid var(--primary); border-radius: var(--radius); padding: var(--space-4); background: var(--primary-soft); min-width: 0; }
+.required-box legend { font-size: var(--text-lg); padding: 0 var(--space-2); display: flex; align-items: center; gap: var(--space-2); }
+.required-box > p { margin: 0 0 var(--space-3); }
+.required-box .table-scroll { background: var(--surface); border-radius: var(--radius-sm); }
+.required-box #ev-summary { margin-top: var(--space-3); }
+.badge-required { background: var(--primary); color: var(--on-primary); border-color: transparent; text-transform: uppercase; letter-spacing: 0.03em; }
+.ev-table input { max-width: 8rem; text-align: right; }
+.ev-table .cat { display: flex; align-items: center; gap: var(--space-2); font-weight: 500; }
+.phase-free-mid { border-radius: 0 !important; }
+.phase-grow { background: var(--surface-2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+@media (max-width: 39.99rem) { .phase-free-mid, .phase-grow { border-radius: var(--radius-sm) !important; } }
