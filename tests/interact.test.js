@@ -30,6 +30,8 @@ const commit = (el, value) => { el.value = value; el.dispatchEvent(new Event("in
 const pick = (el) => { el.checked = true; el.dispatchEvent(new Event("change", { bubbles: true })); };
 const submit = (form) => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
 window.confirm = () => true;
+const addSel = (kind) => `[data-action="open-form"][data-form="${kind}"]`;
+const openForm = (kind) => $(addSel(kind)).click(); // the fields only appear once the add button is pressed
 
 /* ---------- Goals ---------- */
 test("goals: add a goal, fill it in, see it fit, approve it", () => {
@@ -127,11 +129,13 @@ test("budget: an approved goal appears as a line and lowers free money", () => {
 /* ---------- House Planner ---------- */
 test("house: add a salary step and a cost step", () => {
   start("basic", house);
+  openForm("salary");
   type($("#ss-amount"), "2500");
   commit($("#ss-from"), plus(24));
   submit($("#salary-step-form"));
   eq(store.getState().house.salarySteps.length, 1); eq(store.getState().house.salarySteps[0].amount, 2500);
   is($("#future-h").closest("section").textContent.includes("€2,500"), "listed");
+  openForm("cost");
   commit($("#cs-cat"), "groceries");
   type($("#cs-amount"), "450");
   commit($("#cs-from"), plus(30));
@@ -140,6 +144,7 @@ test("house: add a salary step and a cost step", () => {
 });
 test("house: a salary step must be above zero and not before the plan", () => {
   start("basic", house);
+  openForm("salary");
   type($("#ss-amount"), "0");
   commit($("#ss-from"), plus(5));
   submit($("#salary-step-form"));
@@ -148,6 +153,7 @@ test("house: a salary step must be above zero and not before the plan", () => {
 });
 test("house: add an unemployment event and see the installment check flag it", () => {
   start("basic", house);
+  openForm("event");
   type($("#ev-name"), "Unemployed");
   commit($("#ev-start"), plus(70));
   commit($("#ev-end"), plus(74));
@@ -162,6 +168,7 @@ test("house: add an unemployment event and see the installment check flag it", (
 });
 test("house: an event needs a name and at least one change", () => {
   start("basic", house);
+  openForm("event");
   commit($("#ev-start"), plus(10));
   submit($("#event-form"));
   eq(store.getState().house.events.length, 0, "no name");
@@ -177,6 +184,7 @@ test("house: an event needs a name and at least one change", () => {
 });
 test("house: the cost changes box is marked as required", () => {
   start("basic", house);
+  openForm("event");
   const box = $(".required-box");
   is(!!box, "the cost changes box exists and is styled as required");
   is(box.querySelector("legend").textContent.includes("Required"), "it says Required");
@@ -186,6 +194,7 @@ test("house: the cost changes box is marked as required", () => {
 });
 test("house: the event form shows current expenses, per category, and the free money", () => {
   start("basic", house);
+  openForm("event");
   const text = $("#ev-costs").textContent;
   for (const w of ["Rent / mortgage", "Groceries", "Utilities & bills", "Total expenses"]) is(text.includes(w), "table lists " + w);
   is(text.includes("€600") && text.includes("€300"), "current rent and groceries amounts shown");
@@ -195,6 +204,7 @@ test("house: the event form shows current expenses, per category, and the free m
 });
 test("house: typing cost changes shows the change per category and what is left", () => {
   start("basic", house);
+  openForm("event");
   type($("#ev-cost-groceries"), "400");
   is($("#ev-diff-groceries").textContent.includes("+€100"), "groceries +100: " + $("#ev-diff-groceries").textContent);
   is($("#ev-diff-total").textContent.includes("+€100"), "total +100");
@@ -206,6 +216,7 @@ test("house: typing cost changes shows the change per category and what is left"
 });
 test("house: a higher event salary adds to the room, a lower one takes from it", () => {
   start("basic", house);
+  openForm("event");
   type($("#ev-cost-groceries"), "300");
   type($("#ev-salary"), "1000");
   is($("#ev-summary").textContent.includes("short by"), "a salary drop with unchanged costs leaves the budget short");
@@ -215,7 +226,9 @@ test("house: a higher event salary adds to the room, a lower one takes from it",
 test("house: choosing another start month refreshes the current expenses and keeps what was typed", () => {
   start("basic", house);
   // A cost step already raises groceries from this month on.
+  openForm("cost");
   type($("#cs-amount"), "450"); commit($("#cs-cat"), "groceries"); commit($("#cs-from"), plus(10)); submit($("#cost-step-form"));
+  openForm("event");
   is($("#ev-costs").textContent.includes("€300"), "before the step groceries are 300");
   type($("#ev-cost-utilities"), "200");
   commit($("#ev-start"), plus(12));
@@ -224,6 +237,7 @@ test("house: choosing another start month refreshes the current expenses and kee
 });
 test("house: an event with cost changes is saved with them", () => {
   start("basic", house);
+  openForm("event");
   type($("#ev-name"), "Family starts");
   commit($("#ev-start"), plus(30));
   type($("#ev-cost-groceries"), "500");
@@ -231,6 +245,86 @@ test("house: an event with cost changes is saved with them", () => {
   submit($("#event-form"));
   const ev = store.getState().house.events[0];
   eq(ev.name, "Family starts"); eq(ev.costs.groceries, 500); eq(ev.costs.utilities, 170);
+});
+
+/* ---- the add buttons: fields appear on demand, saving closes them ---- */
+test("house: salary steps, cost steps and life events start as just an add button", () => {
+  start("basic", house);
+  for (const id of ["#ss-from", "#ss-amount", "#cs-from", "#cs-amount", "#ev-name", "#ev-start", ".required-box"]) is(!$(id), id + " must not show before its button is pressed");
+  for (const k of ["salary", "cost", "event"]) is(!!$(addSel(k)), k + " add button is there");
+});
+test("house: Add salary step opens the fields; saving closes them and leaves the button below the saved step", () => {
+  start("basic", house);
+  openForm("salary");
+  is(!!$("#ss-from") && !!$("#ss-amount"), "fields open");
+  is(!$(addSel("salary")), "the button is replaced by the open form");
+  eq(document.activeElement.id, "ss-from", "focus goes to the first field");
+  const form = $("#salary-step-form");
+  is(!!form.querySelector('button[type="submit"]'), "the form has a submit button, so Enter in a field saves it");
+  commit($("#ss-from"), plus(24));
+  type($("#ss-amount"), "2600");
+  form.requestSubmit(); // what pressing Enter in a field does
+  eq(store.getState().house.salarySteps.length, 1);
+  is(!$("#salary-step-form"), "the fields close after saving");
+  const list = $("#future-h").closest("section").querySelector(".simple-list");
+  is(list && list.textContent.includes("€2,600"), "the saved step is listed");
+  const button = $(addSel("salary"));
+  is(button && (list.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING), "the add button sits below the saved step");
+});
+test("house: a second salary step opens fresh fields below the first", () => {
+  start("basic", house);
+  openForm("salary"); commit($("#ss-from"), plus(12)); type($("#ss-amount"), "2300"); $("#salary-step-form").requestSubmit();
+  openForm("salary");
+  eq($("#ss-amount").value, "", "the amount box starts empty again");
+  commit($("#ss-from"), plus(36)); type($("#ss-amount"), "2700"); $("#salary-step-form").requestSubmit();
+  eq(store.getState().house.salarySteps.length, 2);
+  eq($$(".simple-list")[0].querySelectorAll("li").length, 2, "both steps are listed");
+});
+test("house: cost steps work the same way", () => {
+  start("basic", house);
+  openForm("cost");
+  commit($("#cs-cat"), "transport"); commit($("#cs-from"), plus(18)); type($("#cs-amount"), "150");
+  $("#cost-step-form").requestSubmit();
+  eq(store.getState().house.costSteps.length, 1);
+  is(!$("#cost-step-form") && !!$(addSel("cost")), "form closed and the button is back");
+});
+test("house: a saved life event closes the form and the button moves below it", () => {
+  start("basic", house);
+  openForm("event");
+  type($("#ev-name"), "Family starts"); commit($("#ev-start"), plus(30)); type($("#ev-cost-groceries"), "500");
+  $("#event-form").requestSubmit();
+  eq(store.getState().house.events.length, 1);
+  is(!$("#event-form") && !$(".required-box"), "the whole form is gone");
+  const section = $("#future-h").closest("section");
+  const list = [...section.querySelectorAll(".simple-list")].find((l) => l.textContent.includes("Family starts"));
+  const button = $(addSel("event"));
+  is(list && button && (list.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING), "the add button sits below the saved event");
+});
+test("house: an invalid entry keeps the form open with the message", () => {
+  start("basic", house);
+  openForm("salary");
+  type($("#ss-amount"), "");
+  $("#salary-step-form").requestSubmit();
+  is(!!$("#salary-step-form"), "still open");
+  is($("#ss-error").textContent.length > 0, "message shown");
+  eq(store.getState().house.salarySteps.length, 0);
+});
+test("house: Cancel and Escape close an open form without saving", () => {
+  start("basic", house);
+  openForm("salary"); type($("#ss-amount"), "3000");
+  $('[data-action="close-form"]').click();
+  is(!$("#salary-step-form") && !!$(addSel("salary")), "closed by Cancel");
+  eq(store.getState().house.salarySteps.length, 0, "nothing saved");
+  openForm("event");
+  $("#ev-name").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  is(!$("#event-form") && !!$(addSel("event")), "closed by Escape");
+  eq(store.getState().house.events.length, 0);
+});
+test("house: only one add form is open at a time", () => {
+  start("basic", house);
+  openForm("salary");
+  openForm("cost");
+  is(!$("#salary-step-form") && !!$("#cost-step-form"), "opening another form replaces the first");
 });
 
 /* ---- age and the view until 65 ---- */

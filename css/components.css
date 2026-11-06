@@ -251,3 +251,6 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 999px; 
 .phase-free-mid { border-radius: 0 !important; }
 .phase-grow { background: var(--surface-2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 @media (max-width: 39.99rem) { .phase-free-mid, .phase-grow { border-radius: var(--radius-sm) !important; } }
+
+/* The "add" button under a list of saved steps or events */
+.add-row { margin: var(--space-3) 0 0; }

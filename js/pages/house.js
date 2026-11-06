@@ -30,6 +30,7 @@ export function render(root) {
   const catName = (c) => (c.builtin ? t("cat." + c.id) : c.name);
   let unmountCharts = [];
   let chartTimer = null;
+  let openForm = null; // which "add" form is open: "salary", "cost", "event" or null (only the button shows)
   let lastA = null; // the latest calculation, used by the life-event form
   let evCtx = null; // what the life-event form shows: expenses and free money in the event's first month
 
@@ -168,6 +169,9 @@ export function render(root) {
       }).join("")}</ul>`
       : `<p class="small muted">${t("house.f.noEvents")}</p>`;
     const catOptions = cats.map((c) => `<option value="${c.id}">${esc(catName(c))}</option>`).join("");
+    // Each list ends with just an "add" button. It opens the fields; Enter (or Save) stores the entry and closes them again.
+    const addButton = (kind, label) => `<p class="add-row"><button type="button" class="btn" data-action="open-form" data-form="${kind}">${icon("plus", { size: 16 })}${label}</button></p>`;
+    const formActions = (saveLabel) => `<p class="small muted">${t("house.f.enterHint")}</p><div class="row"><button class="btn btn-primary" type="submit">${saveLabel}</button><button type="button" class="btn" data-action="close-form">${t("house.f.cancelForm")}</button></div>`;
     const nextMonth = addMonths(currentMonth() < start ? start : currentMonth(), 1);
     evCtx = eventContext(a, nextMonth);
     return `
@@ -179,34 +183,34 @@ export function render(root) {
             <h3>${icon("briefcase", { size: 18 })} ${t("house.f.salaryTitle")}</h3>
             <p class="small muted">${t("house.f.salaryHelp")}</p>
             ${salaryList}
-            <form id="salary-step-form" class="inline-form" novalidate>
+            ${openForm === "salary" ? `<form id="salary-step-form" class="inline-form" novalidate>
               <div class="form-row">
                 ${monthField({ id: "ss-from", label: t("house.f.from"), value: nextMonth, min: start })}
                 <div class="field">${moneyInput({ id: "ss-amount", label: t("house.f.newSalary"), value: "", placeholder: "2200" })}</div>
               </div>
               <p class="error" id="ss-error" role="alert"></p>
-              <div><button class="btn" type="submit">${icon("plus", { size: 16 })}${t("house.f.addSalary")}</button></div>
-            </form>
+              ${formActions(t("house.f.saveSalary"))}
+            </form>` : addButton("salary", t("house.f.addSalary"))}
           </div>
           <div>
             <h3>${icon("coins", { size: 18 })} ${t("house.f.costTitle")}</h3>
             <p class="small muted">${t("house.f.costHelp")}</p>
             ${costList}
-            <form id="cost-step-form" class="inline-form" novalidate>
+            ${openForm === "cost" ? `<form id="cost-step-form" class="inline-form" novalidate>
               <div class="form-row">
                 ${monthField({ id: "cs-from", label: t("house.f.from"), value: nextMonth, min: start })}
                 <div class="field"><label for="cs-cat">${t("house.f.category")}</label><select id="cs-cat">${catOptions}</select></div>
                 <div class="field">${moneyInput({ id: "cs-amount", label: t("house.f.newAmount"), value: "", placeholder: "400" })}</div>
               </div>
               <p class="error" id="cs-error" role="alert"></p>
-              <div><button class="btn" type="submit">${icon("plus", { size: 16 })}${t("house.f.addCost")}</button></div>
-            </form>
+              ${formActions(t("house.f.saveCost"))}
+            </form>` : addButton("cost", t("house.f.addCost"))}
           </div>
         </div>
         <h3 style="margin-top:var(--space-5)">${icon("users", { size: 18 })} ${t("house.f.eventTitle")}</h3>
         <p class="small muted">${t("house.f.eventHelp")}</p>
         ${eventList}
-        <form id="event-form" class="inline-form" novalidate>
+        ${openForm === "event" ? `<form id="event-form" class="inline-form" novalidate>
           <div class="form-row">
             <div class="field"><label for="ev-name">${t("house.f.eventName")}</label><input type="text" id="ev-name" maxlength="60" autocomplete="off" placeholder="${t("house.f.eventNamePh")}"></div>
             ${monthField({ id: "ev-start", label: t("house.f.eventStart"), value: nextMonth, min: start })}
@@ -220,8 +224,8 @@ export function render(root) {
             <div id="ev-summary" class="stack" aria-live="polite"></div>
           </fieldset>
           <p class="error" id="ev-error" role="alert"></p>
-          <div><button class="btn" type="submit">${icon("plus", { size: 16 })}${t("house.f.addEvent")}</button></div>
-        </form>
+          ${formActions(t("house.f.saveEvent"))}
+        </form>` : addButton("event", t("house.f.addEvent"))}
         <h3 style="margin-top:var(--space-5)">${t("house.check.title")}</h3>
         <div id="res-future" aria-live="polite"></div>
       </section>`;
@@ -530,6 +534,15 @@ export function render(root) {
     if (msg) { input.setAttribute("aria-invalid", "true"); input.focus(); } else input.removeAttribute("aria-invalid");
   };
 
+  const addBtn = (kind) => `[data-action="open-form"][data-form="${kind}"]`;
+  /** Closes the open "add" form without saving and puts focus back on its button. */
+  function closeForm() {
+    const kind = openForm;
+    openForm = null;
+    draw(kind ? addBtn(kind) : undefined);
+  }
+  wrap.addEventListener("keydown", (e) => { if (e.key === "Escape" && openForm) closeForm(); });
+
   wrap.addEventListener("click", (e) => {
     const goto = e.target.closest('[data-action="goto-a"]');
     if (goto) { e.preventDefault(); const el = $("#f-amount"); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } return; }
@@ -544,9 +557,13 @@ export function render(root) {
         b.classList.toggle("btn-primary", on);
       });
       refresh();
-    } else if (act === "rm-salary") { store.update((s) => { s.house.salarySteps = s.house.salarySteps.filter((x) => x.id !== btn.dataset.id); }); draw("#ss-from"); }
-    else if (act === "rm-cost") { store.update((s) => { s.house.costSteps = s.house.costSteps.filter((x) => x.id !== btn.dataset.id); }); draw("#cs-from"); }
-    else if (act === "rm-event") { store.update((s) => { s.house.events = s.house.events.filter((x) => x.id !== btn.dataset.id); }); draw("#ev-name"); }
+    } else if (act === "open-form") {
+      openForm = btn.dataset.form;
+      draw({ salary: "#ss-from", cost: "#cs-from", event: "#ev-name" }[openForm]);
+    } else if (act === "close-form") closeForm();
+    else if (act === "rm-salary") { store.update((s) => { s.house.salarySteps = s.house.salarySteps.filter((x) => x.id !== btn.dataset.id); }); draw(addBtn("salary")); }
+    else if (act === "rm-cost") { store.update((s) => { s.house.costSteps = s.house.costSteps.filter((x) => x.id !== btn.dataset.id); }); draw(addBtn("cost")); }
+    else if (act === "rm-event") { store.update((s) => { s.house.events = s.house.events.filter((x) => x.id !== btn.dataset.id); }); draw(addBtn("event")); }
     else if (act === "set-loan") {
       store.update((s) => { s.house.mode = "loan"; s.house.amount = Number(btn.dataset.amount); });
       draw("#f-amount");
@@ -566,7 +583,8 @@ export function render(root) {
         s.house.salarySteps.push({ id: store.newId(), from, amount });
         s.house.salarySteps.sort((x, y) => x.from.localeCompare(y.from));
       });
-      draw("#ss-from");
+      openForm = null;
+      draw(addBtn("salary"));
     } else if (form.id === "cost-step-form") {
       const from = $("#cs-from").value.trim(), amount = parseAmount($("#cs-amount").value), catId = $("#cs-cat").value;
       if (!isMonthKey(from) || from < start) return setError("#cs-error", t("house.f.errMonth", { month: formatMonth(start) }), "#cs-from");
@@ -576,7 +594,8 @@ export function render(root) {
         s.house.costSteps.push({ id: store.newId(), from, catId, amount });
         s.house.costSteps.sort((x, y) => x.from.localeCompare(y.from));
       });
-      draw("#cs-from");
+      openForm = null;
+      draw(addBtn("cost"));
     } else if (form.id === "event-form") {
       const name = $("#ev-name").value.trim(), startM = $("#ev-start").value.trim(), endRaw = $("#ev-end").value.trim();
       const salaryRaw = parseAmount($("#ev-salary").value);
@@ -599,7 +618,8 @@ export function render(root) {
         s.house.events.push({ id: store.newId(), name, start: startM, end: endRaw || null, salary: salaryRaw, costs });
         s.house.events.sort((x, y) => x.start.localeCompare(y.start));
       });
-      draw("#ev-name");
+      openForm = null;
+      draw(addBtn("event"));
     }
   });
 

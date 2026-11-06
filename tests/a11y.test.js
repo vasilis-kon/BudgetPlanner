@@ -47,12 +47,21 @@ try {
         // A blank page would pass trivially, so insist the page really drew.
         const main = frame.contentDocument.querySelector("main");
         if (!main || !main.querySelector("h1") || main.textContent.length < 300) throw new Error(`${route} did not draw any content`);
-        const res = await axeIn(frame.contentWindow);
-        const label = `${route} · ${theme} · ${w}px`;
-        if (!res.violations.length) lines.push(`<span class="pass">PASS</span> ${label}`);
-        for (const v of res.violations) {
-          total++;
-          lines.push(`<span class="fail">FAIL</span> ${label} · ${v.id} (${v.impact}): ${v.help}\n      ${v.nodes.slice(0, 4).map((n) => n.target.join(" ") + " → " + (n.any[0] || n.all[0] || n.none[0] || {}).message).join("\n      ").replace(/</g, "&lt;")}`);
+        // The House Planner's add forms only exist once their button is pressed, so check each one open too.
+        const states = route === "house" ? [null, "salary", "cost", "event"] : [null];
+        for (const state of states) {
+          if (state) {
+            frame.contentDocument.querySelector(`[data-action="open-form"][data-form="${state}"]`).click();
+            await wait(300);
+            if (!frame.contentDocument.querySelector("form.inline-form")) throw new Error(`the ${state} form did not open`);
+          }
+          const res = await axeIn(frame.contentWindow);
+          const label = `${route}${state ? " (" + state + " form open)" : ""} · ${theme} · ${w}px`;
+          if (!res.violations.length) lines.push(`<span class="pass">PASS</span> ${label}`);
+          for (const v of res.violations) {
+            total++;
+            lines.push(`<span class="fail">FAIL</span> ${label} · ${v.id} (${v.impact}): ${v.help}\n      ${v.nodes.slice(0, 4).map((n) => n.target.join(" ") + " → " + (n.any[0] || n.all[0] || n.none[0] || {}).message).join("\n      ").replace(/</g, "&lt;")}`);
+          }
         }
       }
     }

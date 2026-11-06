@@ -105,7 +105,7 @@ Three stages in order, from first savings to a fully paid house. Each stage star
 
 The projection runs on the user's own expectations, not automatic growth:
 
-- **Salary steps:** expected raises or job changes, each a new net salary from a chosen month.
+- **Salary steps:** expected raises or job changes, each a new net salary from a chosen month. Salary steps, cost steps and life events are all added the same way: only an "Add" button shows at first; pressing it opens the fields, Enter saves the entry, and the button then sits below the saved entries.
 - **Cost steps:** expected changes per expense category from a chosen month, for example groceries up when a family starts. Several changes can be grouped as one life event with a start and optional end, for example "Family starts, 2032" or "Unemployed, 4 months" (salary drops, then returns). The site gives no estimates: the user enters every number. **Cost changes are required for a life event** (a salary change alone is not enough). The form shows the user's current expenses per category for the event's first month and how much free money they have, so they can see how much spending can rise, and it updates live as they type.
 - Months with no step keep the last known salary and category amounts.
 - **Installment check:** after any step or life event, the site checks every month can still cover expenses and the installment, and flags the months that can't.
