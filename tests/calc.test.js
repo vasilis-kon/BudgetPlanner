@@ -160,12 +160,12 @@ test("debt-free comes after purchase, before the loan term ends, and the portfol
   is(r.debtFree <= r.termEnd, "debt-free no later than the end of the term");
   eq(r.debtFreeReason, "portfolio");
   is(r.debtFreeInfo.portfolioAfterTax >= r.debtFreeInfo.balance - 0.01, "portfolio must cover the balance");
-  const last = r.rows[r.rows.length - 1];
-  eq(last.key, r.debtFree);
+  const at = r.rows.find((x) => x.key === r.debtFree);
+  is(at.investments >= at.loan - 0.01, "in the debt-free month the portfolio covers the loan still owed");
 });
 test("the month before debt-free the portfolio did not yet cover the loan", () => {
   const r = run(baseState());
-  const before = r.rows[r.rows.length - 2];
+  const before = r.rows[r.rows.findIndex((x) => x.key === r.debtFree) - 1];
   is(before.investments < before.loan, "portfolio " + before.investments + " vs loan " + before.loan);
 });
 test("rent stops at purchase and home costs plus installment start", () => {
@@ -306,7 +306,8 @@ test("loan months and fixed end for a mixed loan", () => {
 test("overview rows: last year ends at debt-free and bank is never double counted", () => {
   const r = run(baseState());
   const last = r.years[r.years.length - 1];
-  eq(last.key, r.debtFree);
+  eq(last.key, r.endKey); eq(r.endKey, r.loanEnd);
+  near(last.nom.loan, 0, 0.01, "the loan is repaid by its installments at the end");
   near(last.nom.bank, last.nom.depositSavings + last.nom.buffer + last.nom.goalFunds + last.nom.unspent, 1e-6, "bank parts");
 });
 test("saved money from the deposit stage: purchase pays down payment and costs from the pot", () => {
@@ -334,31 +335,59 @@ test("with an age, the projection runs on after debt-free until the user is 65",
   is(r.rows.length === monthsBetween(TODAY, r.endKey) + 1, "one row for every month until 65, got " + r.rows.length);
   eq(r.years[r.years.length - 1].key, r.endKey);
 });
-test("without an age the projection still stops at debt-free", () => {
+test("without an age the projection runs on after debt-free until the loan ends", () => {
   const r = run(baseState());
-  eq(r.extended, false); eq(r.endKey, r.debtFree);
+  eq(r.extended, true); eq(r.endKey, r.loanEnd);
+  is(r.loanEnd > r.debtFree, "the loan ends after the debt-free declaration");
+  eq(r.loanEnd, r.termEnd, "no early repayment, so it ends with the term");
 });
 test("the debt-free date is the same with or without the age", () => {
   const a = run(baseState()), b = run(withAge(30));
   eq(b.debtFree, a.debtFree); eq(b.purchase, a.purchase); eq(b.depositReady, a.depositReady);
 });
-test("after debt-free: no loan, no installment, and the portfolio keeps growing", () => {
+test("debt-free is only a declaration: nothing is sold and the portfolio keeps growing", () => {
   const r = run(withAge(30));
-  const after = r.rows.filter((x) => x.key > r.debtFree);
-  is(after.length > 100, "many months after debt-free");
-  is(after.every((x) => x.loan === 0 && x.installment === 0), "loan and installment must be zero");
-  is(after[after.length - 1].investments > after[0].investments, "portfolio must grow");
+  const at = r.rows.findIndex((x) => x.key === r.debtFree);
+  for (let i = at; i < r.rows.length - 1; i++) {
+    is(r.rows[i + 1].investments >= r.rows[i].investments - 0.01, `portfolio fell between ${r.rows[i].key} and ${r.rows[i + 1].key}`);
+  }
+  is(r.rows[at + 1].gross > r.rows[at].gross, "gross portfolio grows right after the declaration");
 });
-test("paying the loan off from the portfolio keeps net worth steady (no money appears or vanishes)", () => {
+test("the loan keeps being paid after debt-free: same installment, balance falling every month until it ends", () => {
+  const r = run(baseState());
+  const at = r.rows.findIndex((x) => x.key === r.debtFree);
+  const first = r.rows.find((x) => x.owns).installment;
+  const during = r.rows.slice(at).filter((x) => x.key <= r.loanEnd);
+  is(during.length > 60, "many months of installments remain after debt-free: " + during.length);
+  for (let i = 0; i < during.length; i++) {
+    near(during[i].installment, first, 0.01, "installment at " + during[i].key);
+    is(during[i].loan > 0 || during[i].key === r.loanEnd, "loan still owed at " + during[i].key);
+    if (i) is(during[i].loan < during[i - 1].loan, "balance must fall at " + during[i].key);
+  }
+  near(r.rows.find((x) => x.key === r.loanEnd).loan, 0, 0.01, "zero at the end");
+  const afterEnd = r.rows.filter((x) => x.key > r.loanEnd);
+  is(afterEnd.every((x) => x.installment === 0 && x.loan === 0), "no installment once the loan has ended");
+});
+test("after debt-free the loan balance is still owed in the following months", () => {
+  const r = run(withAge(30));
+  const next = r.rows.find((x) => x.key === addMonths(r.debtFree, 1));
+  is(next.loan > 1000, "loan still owed: " + Math.round(next.loan));
+  near(next.loan, r.debtFreeInfo.balance, r.debtFreeInfo.balance * 0.02, "about the same balance, one installment lower");
+});
+test("net worth carries on smoothly through the debt-free month", () => {
   const r = run(withAge(30));
   const at = r.rows.findIndex((x) => x.key === r.debtFree);
   const before = r.rows[at], next = r.rows[at + 1];
-  is(Math.abs(next.netWorth - before.netWorth) < 2500, `net worth ${Math.round(before.netWorth)} -> ${Math.round(next.netWorth)}`);
-  is(next.investments < before.investments, "the portfolio paid the loan");
+  is(next.netWorth > before.netWorth && next.netWorth - before.netWorth < 3000, `net worth ${Math.round(before.netWorth)} -> ${Math.round(next.netWorth)}`);
 });
-test("after payoff the monthly leftover is the full free money, now without the installment", () => {
+test("after debt-free the installment is still paid out of your salary each month", () => {
   const r = run(withAge(30));
   const post = r.rows.find((x) => x.key === addMonths(r.debtFree, 2));
+  near(post.leftover, 2000 - 300 - 120 - 739.88, 1, "salary - groceries - home costs - installment");
+});
+test("once the loan has ended the full free money is left", () => {
+  const r = run(withAge(30));
+  const post = r.rows.find((x) => x.key === addMonths(r.loanEnd, 3));
   near(post.leftover, 2000 - 300 - 120, 0.01, "salary - groceries - home costs");
 });
 test("net worth drops by the purchase costs when the house is bought, nothing else", () => {
@@ -452,16 +481,18 @@ test("roadmap lists goals, events, deposit, purchase and debt-free in date order
   const r = project(inp);
   const items = buildRoadmap({ today: TODAY, goals: inp.goals, events: st.house.events, result: r });
   const kinds = items.map((i) => i.kind);
-  for (const k of ["goal", "event", "deposit", "purchase", "debtFree"]) is(kinds.includes(k), "missing " + k);
+  for (const k of ["goal", "event", "deposit", "purchase", "debtFree", "loanEnd"]) is(kinds.includes(k), "missing " + k);
   for (let i = 1; i < items.length; i++) is(items[i - 1].key <= items[i].key, "not sorted at " + i);
-  eq(items[items.length - 1].kind, "debtFree");
+  eq(items[items.length - 1].kind, "loanEnd", "the loan's last installment closes the roadmap");
 });
-test("roadmap: debt-free is the last milestone and its date matches the projection", () => {
+test("roadmap: debt-free and loan end dates match the projection, and debt-free comes first", () => {
   const st = fullState();
   const inp = inputFromState(st, TODAY);
   const r = project(inp);
   const items = buildRoadmap({ today: TODAY, goals: inp.goals, events: st.house.events, result: r });
-  eq(items[items.length - 1].key, r.debtFree);
+  eq(items.find((i) => i.kind === "debtFree").key, r.debtFree);
+  eq(items.find((i) => i.kind === "loanEnd").key, r.loanEnd);
+  is(r.debtFree < r.loanEnd, "debt-free is declared before the loan ends");
 });
 test("roadmap: you-are-here marker sits before the first milestone that is not in the past", () => {
   const st = fullState();

@@ -1,6 +1,10 @@
 // The plan, month by month: salary and costs (with the user's expected changes), goals, the deposit,
 // the loan, the ETF portfolio and the end point: debt-free. Pure functions: plain data in, plain data out.
 //
+// Debt-free is a declaration, not a sale: the month the after-tax portfolio covers the loan still owed,
+// the user could pay it all off. Nothing is sold; installments keep running and both the loan and the
+// portfolio are tracked until the loan ends (or until age 65, whichever is later).
+//
 // Rules from docs/website-map.md that this file implements:
 //  - No automatic inflation or salary growth. Money views in "today's euros" only deflate the result.
 //  - Bills, goals and the installment are paid from the 12 regular salaries.
@@ -135,7 +139,7 @@ export function project(inp, prep = prepare(inp)) {
   const out = {
     fin, start: inp.start, today, rows: [], years: [], problems: [],
     depositReady: null, purchase: null, fixedEnd: null, termEnd: null, debtFree: null, debtFreeReason: null,
-    endKey: null, retireKey: inp.endKey || null, extended: false, debtFreeInfo: null, loanFirstInstallment: null, loanLaterInstallment: null,
+    endKey: null, retireKey: inp.endKey || null, extended: false, loanEnd: null, debtFreeInfo: null, loanFirstInstallment: null, loanLaterInstallment: null,
     salaryAtPurchase: null, paybackFallbacks: [],
   };
   if (!fin.ok) return out;
@@ -260,9 +264,12 @@ export function project(inp, prep = prepare(inp)) {
     };
     for (const k of Object.keys(yearFlows)) { yearFlows[k] += flow[k]; yearFlowsReal[k] += flow[k] * fac; }
 
-    // Debt-free: the loan is gone, or the portfolio after tax covers what is still owed.
-    const keepGoing = () => Boolean(inp.endKey) && key < inp.endKey; // carry on until age 65 after debt-free
-    if (owns && loan) {
+    // The loan is fully repaid by the installments (it may happen long after the debt-free declaration).
+    if (owns && loan && loan.balance < EPS && out.loanEnd === null) out.loanEnd = key;
+
+    // Debt-free: the loan is gone, or the portfolio after tax covers what is still owed. This only declares it;
+    // the loan keeps being paid and nothing is sold.
+    if (owns && loan && out.debtFree === null) {
       const paidOff = loan.balance < EPS;
       if (paidOff || afterTax >= loan.balance) {
         out.debtFree = key;
@@ -270,24 +277,22 @@ export function project(inp, prep = prepare(inp)) {
         const rest = loan.clone();
         let remaining = 0, remainingReal = 0, k = 0;
         while (rest.balance > EPS && k < 1200) {
-          const s = rest.step();
+          const st2 = rest.step();
           const f = todayFactor(today, addMonths(key, ++k), infl);
-          remaining += s.interest; remainingReal += s.interest * f;
+          remaining += st2.interest; remainingReal += st2.interest * f;
         }
+        // What paying it all off at this point would leave and save. It is not done in the plan.
         out.debtFreeInfo = {
           balance: loan.balance, portfolioAfterTax: afterTax, surplus: afterTax - loan.balance,
           surplusReal: (afterTax - loan.balance) * fac, interestAvoided: remaining, interestAvoidedReal: remainingReal,
         };
-        if (keepGoing()) {
-          // Pay the loan off by selling just enough of the portfolio; from next month there is no installment.
-          if (!paidOff && afterTax > 0) { const sold = loan.balance / afterTax; P -= P * sold; basis -= basis * sold; }
-          loan = null;
-          out.extended = true;
-        }
       }
     }
 
-    const finished = out.debtFree !== null && !keepGoing();
+    // Keep tracking while the loan is still owed, or until the retirement month if the age is known.
+    const keepGoing = (Boolean(inp.endKey) && key < inp.endKey) || (Boolean(loan) && loan.balance > EPS);
+    if (out.debtFree !== null && keepGoing) out.extended = true;
+    const finished = out.debtFree !== null && !keepGoing;
     if (month === 12 || finished || i === H - 1) pushYear(row);
     if (finished) break;
   }

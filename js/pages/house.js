@@ -388,7 +388,7 @@ export function render(root) {
     const headline = `<div class="headline">${icon("badge-check")}<div><p class="stat-label">${t("house.c.debtFreeLabel")}</p><p class="stat-value">${formatMonth(r.debtFree)}</p>
       <p class="stat-sub">${t("house.c.afterBuying", { time: duration(months), month: formatMonth(r.purchase) })}${early > 0 ? " · " + t("house.c.early", { time: duration(early) }) : ""}</p></div></div>`;
     const why = r.debtFreeReason === "portfolio"
-      ? `<p>${t("house.c.whyPortfolio", { portfolio: eur(a.conv(info.portfolioAfterTax, r.debtFree)), balance: eur(a.conv(info.balance, r.debtFree)) })}</p>`
+      ? `<p>${t("house.c.whyPortfolio", { portfolio: eur(a.conv(info.portfolioAfterTax, r.debtFree)), balance: eur(a.conv(info.balance, r.debtFree)), loanEnd: formatMonth(r.loanEnd || r.termEnd) })}</p>`
       : `<p>${t("house.c.whyPaid")}</p>`;
     const unitsNote = a.units === "today" ? t("house.c.unitsToday", { infl: a.infl }) : t("house.c.unitsFuture");
     const stats = `<dl class="stat-grid">
@@ -423,10 +423,10 @@ export function render(root) {
     const sweepRows = sweep.map((p) => [String(p.years), p.toDebtFree === null ? "–" : p.toDebtFree.toFixed(1)]);
 
     const ageHint = a.h.age ? "" : `<div class="note">${icon("info", { size: 18 })}<p>${t("house.c.ageHint", { retire: RETIREMENT_AGE })}</p></div>`;
-    const loanSum = r.extended
-      ? t("house.c.chartLoanSumExt", { unit: unitLabel, month: formatMonth(r.debtFree), retire: RETIREMENT_AGE })
-      : t("house.c.chartLoanSum", { unit: unitLabel, month: formatMonth(r.debtFree) });
-    const flowSum = t(r.extended ? "house.c.chartFlowSumExt" : "house.c.chartFlowSum", { unit: unitLabel, retire: RETIREMENT_AGE });
+    const toRetire = Boolean(r.retireKey) && r.endKey === r.retireKey; // charts run until 65, not just until the loan ends
+    const loanEndText = formatMonth(r.loanEnd || r.termEnd);
+    const loanSum = t(toRetire ? "house.c.chartLoanSumExt" : "house.c.chartLoanSum", { unit: unitLabel, month: formatMonth(r.debtFree), loanEnd: loanEndText, retire: RETIREMENT_AGE });
+    const flowSum = t(toRetire ? "house.c.chartFlowSumExt" : "house.c.chartFlowSum", { unit: unitLabel, retire: RETIREMENT_AGE });
 
     box.innerHTML = ageHint +
       chartFigure({ id: "ch-loan", title: t("house.c.chartLoan"), summary: loanSum, tableLabel: t("house.c.showTable"),

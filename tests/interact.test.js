@@ -253,7 +253,7 @@ test("overview: without an age it asks for one; with an age it runs until 65 and
   localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load();
   stage.innerHTML = ""; overview.render(stage);
   const rowsWith = $$(".data-table tbody tr").length;
-  is(rowsWith > rowsWithout + 10, `many more years with an age: ${rowsWithout} -> ${rowsWith}`);
+  is(rowsWith > rowsWithout + 5, `more years with an age: ${rowsWithout} -> ${rowsWith}`);
   const lastYear = Number($(".data-table tbody tr:last-child th").textContent.slice(0, 4));
   eq(lastYear, new Date().getFullYear() + 35, "last row is the year the user turns 65");
   is($(".data-table thead").textContent.includes("Net worth"), "net worth column");

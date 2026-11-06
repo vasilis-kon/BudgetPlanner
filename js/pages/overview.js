@@ -37,7 +37,8 @@ export function render(root) {
     // One bar for the whole plan: saving, then loan plus investing, then debt-free.
     const saveMonths = monthsBetween(r.start, r.purchase);
     const loanLen = monthsBetween(r.purchase, r.debtFree) + 1;
-    const growMonths = r.extended ? monthsBetween(r.debtFree, r.endKey) : 0;
+    const growMonths = Math.max(0, monthsBetween(r.debtFree, r.endKey)); // after the declaration the loan and portfolio are still tracked
+    const toRetire = Boolean(r.retireKey) && r.endKey === r.retireKey;
     const total = saveMonths + loanLen + growMonths;
     const hereRaw = monthsBetween(r.start, today) / total;
     const here = Math.max(0, Math.min(1, hereRaw));
@@ -46,7 +47,7 @@ export function render(root) {
         <div class="phase phase-save" style="flex:${Math.max(1, saveMonths)}"><strong>${t("overview.phaseSave")}</strong><span>${formatMonth(r.start)} – ${formatMonth(r.depositReady)}</span><span>${duration(saveMonths)}</span></div>
         <div class="phase phase-loan" style="flex:${Math.max(1, loanLen)}"><strong>${t("overview.phaseLoan")}</strong><span>${formatMonth(r.purchase)} – ${formatMonth(r.debtFree)}</span><span>${duration(loanLen)}</span></div>
         <div class="phase phase-free ${growMonths ? "phase-free-mid" : ""}"><strong>${icon("badge-check", { size: 18 })} ${t("overview.phaseFree")}</strong><span>${formatMonth(r.debtFree)}</span></div>
-        ${growMonths ? `<div class="phase phase-grow" style="flex:${Math.max(1, growMonths)}"><strong>${t("overview.phaseGrow", { retire: RETIREMENT_AGE })}</strong><span>${formatMonth(r.debtFree)} – ${formatMonth(r.endKey)}</span><span>${duration(growMonths)}</span></div>` : ""}
+        ${growMonths ? `<div class="phase phase-grow" style="flex:${Math.max(1, growMonths)}"><strong>${t(toRetire ? "overview.phaseGrowAge" : "overview.phaseGrow", { retire: RETIREMENT_AGE })}</strong><span>${formatMonth(r.debtFree)} – ${formatMonth(r.endKey)}</span><span>${duration(growMonths)}</span>${r.loanEnd && r.loanEnd > r.debtFree ? `<span>${t("overview.loanEnds", { month: formatMonth(r.loanEnd) })}</span>` : ""}</div>` : ""}
         ${hereRaw >= 0 && hereRaw <= 1 ? `<span class="here-pin" aria-hidden="true">${icon("map-pin", { size: 18 })}</span>` : ""}
       </div>
       <p class="small muted">${hereRaw < 0 ? t("overview.hereBefore", { month: formatMonth(r.start) }) : hereRaw > 1 ? t("overview.hereAfter") : t("overview.here", { month: formatMonth(today), pct: Math.round(here * 100) })}</p>`;
@@ -57,7 +58,7 @@ export function render(root) {
       <div class="stat"><dt>${t("overview.sBuy")}</dt><dd>${formatMonth(r.purchase)}</dd></div>
       <div class="stat"><dt>${t("overview.sFree")}</dt><dd>${formatMonth(r.debtFree)}</dd><dd class="sub">${t("overview.sFreeSub", { time: duration(loanMonths(r)) })}</dd></div>
       <div class="stat"><dt>${t("overview.sLeft")}</dt><dd>${eur(units === "today" ? info.surplusReal : info.surplus)}</dd><dd class="sub">${t("overview.sLeftSub")}</dd></div>
-      <div class="stat"><dt>${t(r.extended ? "overview.sWorthAge" : "overview.sWorth", { retire: RETIREMENT_AGE })}</dt><dd>${eur(pick(r.years[r.years.length - 1]).netWorth)}</dd><dd class="sub">${t("overview.sWorthSub", { month: formatMonth(r.endKey) })}</dd></div>
+      <div class="stat"><dt>${t(toRetire ? "overview.sWorthAge" : "overview.sWorth", { retire: RETIREMENT_AGE })}</dt><dd>${eur(pick(r.years[r.years.length - 1]).netWorth)}</dd><dd class="sub">${t("overview.sWorthSub", { month: formatMonth(r.endKey) })}</dd></div>
     </dl>`;
     const ageHint = s.house.age ? "" : `<div class="note" style="margin-top:var(--space-3)">${icon("info", { size: 18 })}<p>${t("overview.ageHint", { retire: RETIREMENT_AGE })} <a href="#/house">${t("overview.ageLink")}</a></p></div>`;
 
@@ -93,7 +94,7 @@ export function render(root) {
         </section>
         <section class="card" aria-labelledby="ov-table">
           <h2 id="ov-table">${t("overview.tableTitle")}</h2>
-          <p class="small muted">${t(r.extended ? "overview.tableNoteExt" : "overview.tableNote", { unit: unitLabel, retire: RETIREMENT_AGE })}</p>
+          <p class="small muted">${t(toRetire ? "overview.tableNoteExt" : "overview.tableNote", { unit: unitLabel, retire: RETIREMENT_AGE })}</p>
           <div class="table-scroll" role="region" tabindex="0" aria-label="${t("overview.tableTitle")}">${tableHtml}</div>
         </section>
       </div>`;

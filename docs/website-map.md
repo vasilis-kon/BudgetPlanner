@@ -131,7 +131,7 @@ The projection runs on the user's own expectations, not automatic growth:
 - Shows when the portfolio, after tax, can pay off the remaining loan, and the advantage of investing in today's money.
 - Charts: loan balance vs. portfolio, where the salary goes each year, years of support income vs. years to debt-free.
 - The "where the salary goes" chart draws a line for the year's total pay (14 salaries), the most that can be spent, so the user sees how close the bars come to it.
-- **Retirement view:** the user enters their age. The loan-vs-portfolio and pay charts then continue after debt-free until age 65, the retirement age in Greece. At debt-free the loan is paid off by selling part of the portfolio; after that there is no installment and the rest keeps growing.
+- **Retirement view:** the user enters their age. The loan-vs-portfolio and pay charts then continue after debt-free until age 65, the retirement age in Greece. Debt-free is a declaration, not a sale: nothing is sold. The loan keeps being paid by its installments and both the loan balance and the portfolio keep being tracked until the loan ends (or age 65, whichever is later).
 
 **Support income rules (decided)**
 
@@ -148,7 +148,7 @@ One view of where the user's money sits at the end of each year, from the first 
 - **Loan:** remaining balance.
 - A single timeline bar: saving the deposit, then loan plus investing, then debt-free.
 - Toggle between future euros and today's money, plus a year-by-year table.
-- **Net worth:** with the user's age known, the Overview runs until age 65. It adds the home (at its purchase price; the site assumes no price growth) and a net worth line: bank plus investments plus home, minus the loan.
+- **Net worth:** with the user's age known, the Overview runs until age 65. It adds the home (at its purchase price; the site assumes no price growth) and a net worth line: bank plus investments plus home, minus the loan. After the debt-free declaration the loan balance keeps falling with the installments, so the user can see how the debt progresses.
 
 ## Not in this version
 

@@ -9,7 +9,7 @@ import { monthsBetween, addMonths } from "../calc/budget.js";
 import { inputFromState, prepare, project, loanMonths } from "../calc/projection.js";
 import { buildRoadmap, hereIndex } from "../calc/roadmap.js";
 
-const ICONS = { goal: "target", event: "calendar-clock", deposit: "piggy-bank", purchase: "key-round", fixedEnd: "hourglass", debtFree: "badge-check" };
+const ICONS = { goal: "target", event: "calendar-clock", deposit: "piggy-bank", purchase: "key-round", fixedEnd: "hourglass", debtFree: "badge-check", loanEnd: "circle-check" };
 
 function milestone(it, today) {
   const pct = Math.round((it.progress ?? 0) * 100);
@@ -34,6 +34,9 @@ function milestone(it, today) {
   } else if (it.kind === "debtFree") {
     title = t("home.m.debtFree");
     detail = t(it.reason === "portfolio" ? "home.m.debtFreePortfolio" : "home.m.debtFreePaid");
+  } else if (it.kind === "loanEnd") {
+    title = t("home.m.loanEnd");
+    detail = t("home.m.loanEndDetail");
   }
   const state = it.done ? t("home.done") : it.key === today ? t("home.thisMonth") : "";
   return `

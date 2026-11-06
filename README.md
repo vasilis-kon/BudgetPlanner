@@ -20,7 +20,7 @@ The full specification is in [docs/website-map.md](docs/website-map.md).
 | House Planner | Your expected future (salary steps, cost steps, life events with required cost changes, installment check), then Stage A save the deposit, Stage B size the loan, Stage C invest until debt-free, with charts. Enter your age and the charts run until 65. |
 | Overview | Bank, investments, home, loan and net worth at the end of each year (until 65 once you enter your age), one timeline bar, and a year-by-year table. |
 
-The plan ends when you are debt-free: the month your investments, after tax on gains, cover what is still owed on the loan.
+You are debt-free in the first month your investments, after tax on gains, cover what is still owed on the loan: you could pay it all off if you wanted to. The plan does not sell anything. The installments keep paying the loan down, and the loan and the portfolio are tracked until the loan ends (or you are 65).
 
 ## How it works
 

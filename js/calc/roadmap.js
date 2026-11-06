@@ -2,7 +2,7 @@
 import { addMonths } from "./budget.js";
 import { goalPlan, goalContribution } from "./goals.js";
 
-const ORDER = { goal: 0, event: 1, deposit: 2, purchase: 3, fixedEnd: 4, debtFree: 5 };
+const ORDER = { goal: 0, event: 1, deposit: 2, purchase: 3, fixedEnd: 4, debtFree: 5, loanEnd: 6 };
 
 /**
  * Milestones in date order. Each has a `key` (month), a `kind`, where it links to, and for goals and the
@@ -36,8 +36,10 @@ export function buildRoadmap({ today, goals, events, result }) {
       items.push({ kind: "deposit", key: result.depositReady, cashNeeded: result.fin.cashNeeded, progress, href: "#/house" });
     }
     if (result.purchase) items.push({ kind: "purchase", key: result.purchase, href: "#/house" });
-    if (result.fixedEnd && (!result.debtFree || result.fixedEnd <= result.debtFree)) items.push({ kind: "fixedEnd", key: result.fixedEnd, href: "#/house" });
+    if (result.fixedEnd && result.endKey && result.fixedEnd <= result.endKey) items.push({ kind: "fixedEnd", key: result.fixedEnd, href: "#/house" });
     if (result.debtFree) items.push({ kind: "debtFree", key: result.debtFree, reason: result.debtFreeReason, href: "#/overview" });
+    // The loan keeps being paid after the debt-free declaration; its last installment is a milestone too.
+    if (result.debtFree && result.loanEnd && result.loanEnd > result.debtFree) items.push({ kind: "loanEnd", key: result.loanEnd, href: "#/overview" });
   }
 
   items.sort((a, b) => a.key.localeCompare(b.key) || ORDER[a.kind] - ORDER[b.kind]);

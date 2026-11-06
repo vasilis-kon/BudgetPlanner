@@ -49,6 +49,7 @@ for (const variant of ["empty", "basic", "full"]) {
       expect["roadmap shows Debt-free"] = (o) => o.text.includes("Debt-free");
       expect["roadmap shows both goals"] = (o) => o.text.includes("Dream Car") && o.text.includes("Wedding");
       expect["roadmap shows the life event"] = (o) => o.text.includes("Family starts");
+      expect["roadmap shows the loan being fully repaid after debt-free"] = (o) => o.text.indexOf("Debt-free") < o.text.indexOf("Loan fully repaid") && o.text.includes("Nothing is sold");
       expect["roadmap has progress bars"] = (o) => o.root.querySelectorAll("progress").length >= 2;
     }
     if (name === "home" && variant === "empty") expect["who this is for note shows"] = (o) => o.text.includes("Who this is for");
@@ -120,6 +121,12 @@ try {
   if (ov.data.labels.at(-1) !== String(year65)) throw new Error("overview chart should end in " + year65);
   const worth = ov.data.datasets.find((d) => d.label === "Net worth").data;
   if (!(worth.at(-1) > worth[0])) throw new Error("net worth should grow over the years");
+  // The loan keeps shrinking after the portfolio first covers it, instead of vanishing.
+  const loanLine = ov.data.datasets.find((d) => d.label === "Loan balance").data;
+  const invest = ov.data.datasets.find((d) => d.label === "Investments after tax").data;
+  const cross = loanLine.findIndex((v, k) => v !== null && invest[k] >= v);
+  if (cross < 0 || !(loanLine[cross + 1] > 0) || !(loanLine[cross + 1] < loanLine[cross])) throw new Error("the loan should still be owed, and smaller, the year after debt-free: " + JSON.stringify(loanLine.slice(cross, cross + 3)));
+  if (loanLine.at(-1) !== 0) throw new Error("the loan should be repaid by the end");
   results.push({ name: "overview chart: net worth line and home column, running until age 65", ok: true });
   clean2();
 } catch (e) {
