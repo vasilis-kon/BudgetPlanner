@@ -1,0 +1,13 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Local tooling
+node_modules/
+*.log
+.claude/
+graphify-out/
+design-system/

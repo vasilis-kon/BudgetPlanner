@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Clear Spiti saved inputs</title>
+<style>body{font-family:system-ui,Arial,sans-serif;max-width:560px;margin:60px auto;padding:0 16px;line-height:1.5}code{background:#eee;padding:1px 5px;border-radius:4px}</style></head>
+<body>
+<h1>Clearing saved inputs</h1>
+<p id="msg">Working…</p>
+<script>
+var m=document.getElementById("msg");
+try{
+  var had=localStorage.getItem("spiti-plan-v1")!==null;
+  var size=had?localStorage.getItem("spiti-plan-v1").length:0;
+  localStorage.removeItem("spiti-plan-v1");
+  var still=localStorage.getItem("spiti-plan-v1")!==null;
+  m.innerHTML=still?"Couldn't remove the saved inputs. Chrome may be blocking storage for local files."
+    :(had?"Done. Removed the saved inputs for the Spiti Freedom Plan ("+size+" characters). You can close this tab and open <code>greece-house-plan.html</code> again."
+         :"There were no saved inputs for the Spiti Freedom Plan in this browser, so saved data isn't what's stopping it from loading.");
+}catch(e){m.textContent="Chrome blocked access to local storage: "+e.message}
+</script>
+</body></html>

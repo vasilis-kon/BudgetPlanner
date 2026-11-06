@@ -1,0 +1,153 @@
+// Start-up: builds the page frame, handles hash routes, theme, menu, backup export/import.
+import { t } from "./i18n/index.js";
+import { icon } from "./components/icon.js";
+import * as store from "./store.js";
+import * as home from "./pages/home.js";
+import * as budget from "./pages/budget.js";
+import * as goals from "./pages/goals.js";
+import * as house from "./pages/house.js";
+import * as overview from "./pages/overview.js";
+
+const ROUTES = {
+  home: { page: home, icon: "map-pinned" },
+  budget: { page: budget, icon: "wallet" },
+  goals: { page: goals, icon: "target" },
+  house: { page: house, icon: "house" },
+  overview: { page: overview, icon: "chart-line" },
+};
+const DEFAULT_ROUTE = "home";
+
+const $ = (id) => document.getElementById(id);
+let cleanup = null;
+
+function currentRoute() {
+  const name = location.hash.replace(/^#\/?/, "").split("?")[0];
+  return ROUTES[name] ? name : DEFAULT_ROUTE;
+}
+
+function renderHeader() {
+  const nav = Object.entries(ROUTES)
+    .map(([name, r]) => `<li><a href="#/${name}" data-route="${name}">${icon(r.icon)}<span>${t("nav." + name)}</span></a></li>`)
+    .join("");
+  $("site-header").innerHTML = `
+    <div class="header-inner">
+      <a class="brand" href="#/home">${icon("piggy-bank", { size: 24 })}<span>${t("app.name")}</span></a>
+      <nav class="main-nav" id="main-nav" aria-label="${t("nav.label")}"><ul>${nav}</ul></nav>
+      <div class="header-actions">
+        <button type="button" class="btn btn-quiet btn-icon" id="theme-toggle"></button>
+        <button type="button" class="btn btn-quiet menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="main-nav">
+          ${icon("menu")}<span>${t("nav.menu")}</span>
+        </button>
+      </div>
+    </div>`;
+  $("menu-toggle").addEventListener("click", () => setMenu(!$("main-nav").classList.contains("open")));
+  $("main-nav").addEventListener("click", (e) => { if (e.target.closest("a")) setMenu(false); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("main-nav").classList.contains("open")) { setMenu(false); $("menu-toggle").focus(); }
+  });
+  $("theme-toggle").addEventListener("click", toggleTheme);
+  updateThemeButton();
+}
+
+function setMenu(open) {
+  $("main-nav").classList.toggle("open", open);
+  const btn = $("menu-toggle");
+  btn.setAttribute("aria-expanded", String(open));
+  btn.querySelector("svg").outerHTML = icon(open ? "x" : "menu");
+}
+
+function isDark() {
+  const th = store.getState().settings.theme;
+  return th === "dark" || (th === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+}
+function applyTheme() {
+  const th = store.getState().settings.theme;
+  if (th === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", th);
+}
+function updateThemeButton() {
+  const dark = isDark();
+  const label = dark ? t("theme.toggleToLight") : t("theme.toggleToDark");
+  const btn = $("theme-toggle");
+  btn.innerHTML = icon(dark ? "sun" : "moon");
+  btn.setAttribute("aria-label", label);
+  btn.title = label;
+}
+function toggleTheme() {
+  store.update((s) => { s.settings.theme = isDark() ? "light" : "dark"; });
+  applyTheme();
+  updateThemeButton();
+}
+
+function renderFooter() {
+  $("site-footer").innerHTML = `
+    <div class="footer-inner">
+      <p class="small muted">${t("footer.saved")}</p>
+      <div class="row">
+        <button type="button" class="btn btn-small" id="export-btn">${icon("download", { size: 16 })}${t("footer.export")}</button>
+        <button type="button" class="btn btn-small" id="import-btn">${icon("upload", { size: 16 })}${t("footer.import")}</button>
+        <input type="file" id="import-file" accept="application/json,.json" class="visually-hidden" tabindex="-1" aria-hidden="true">
+      </div>
+      <p class="small" id="backup-msg" role="status"></p>
+    </div>`;
+  $("export-btn").addEventListener("click", () => {
+    const blob = new Blob([store.exportJson()], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `budgetplanner-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $("import-btn").addEventListener("click", () => $("import-file").click());
+  $("import-file").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const ok = file.size < 5e6 && store.importJson(await file.text());
+    $("backup-msg").textContent = ok ? t("footer.importOk") : t("footer.importBad");
+    if (ok) { applyTheme(); updateThemeButton(); render(); }
+  });
+}
+
+function updateBanner() {
+  $("banner").className = store.isStorageOk() ? "" : "banner";
+  $("banner").textContent = store.isStorageOk() ? "" : t("footer.storageOff");
+}
+
+function render() {
+  if (cleanup) { cleanup(); cleanup = null; }
+  const name = currentRoute();
+  document.querySelectorAll("[data-route]").forEach((a) => {
+    if (a.dataset.route === name) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+  const main = $("main");
+  main.innerHTML = "";
+  cleanup = ROUTES[name].page.render(main) || null;
+  document.title = `${t("nav." + name)} · ${t("app.name")}`;
+  updateBanner();
+}
+
+function onHashChange() {
+  render();
+  window.scrollTo(0, 0);
+  const h1 = $("main").querySelector("h1");
+  if (h1) { h1.setAttribute("tabindex", "-1"); h1.focus({ preventScroll: true }); } // announce the new page
+}
+
+function start() {
+  store.load();
+  applyTheme();
+  $("skip-link").textContent = t("app.skip");
+  // A plain "#main" link would change the route, so move focus by script instead.
+  $("skip-link").addEventListener("click", (e) => { e.preventDefault(); $("main").focus(); });
+  renderHeader();
+  renderFooter();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", updateThemeButton);
+  store.subscribe(updateBanner);
+  window.addEventListener("hashchange", onHashChange);
+  if (!location.hash) history.replaceState(null, "", "#/" + DEFAULT_ROUTE);
+  render();
+}
+
+start();

@@ -1,0 +1,102 @@
+/* Design tokens: calm, trustworthy, flat. Light by default, dark via OS setting or the toggle. */
+:root {
+  color-scheme: light;
+
+  /* Colour: surfaces and text */
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --surface-2: #f0efe9;
+  --border: #d9d7cf;
+  --border-strong: #b9b6ab;
+  --text: #1b2433;
+  --text-muted: #55607a;
+
+  /* Colour: brand and status (each text/background pair is at least 4.5:1) */
+  --primary: #1e40af;
+  --primary-hover: #1a3699;
+  --on-primary: #ffffff;
+  --primary-text: #1e40af;
+  --primary-soft: #e6ecfb;
+  --positive-text: #0b6b62;
+  --positive-bg: #e0f2ef;
+  --warn-text: #8a3b0c;
+  --warn-bg: #fdf0d3;
+  --danger-text: #b01c1c;
+  --danger-bg: #fde6e6;
+  --focus: #1e40af;
+
+  /* Type */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.4375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.125rem;
+  --leading: 1.5;
+
+  /* Spacing (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  /* Shape and motion */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --tap: 2.75rem; /* 44px minimum touch target */
+  --ease: 160ms ease-out;
+  --max-width: 72rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f172a;
+    --surface: #172033;
+    --surface-2: #1e293b;
+    --border: #2b3750;
+    --border-strong: #46557a;
+    --text: #e8ecf4;
+    --text-muted: #a3aec6;
+    --primary: #3b6fe0;
+    --primary-hover: #4d7ee8;
+    --on-primary: #ffffff;
+    --primary-text: #9bb9ff;
+    --primary-soft: #1b2a50;
+    --positive-text: #5eead4;
+    --positive-bg: #0f2c30;
+    --warn-text: #fcd34d;
+    --warn-bg: #36280c;
+    --danger-text: #fca5a5;
+    --danger-bg: #3b1519;
+    --focus: #9bb9ff;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --surface: #172033;
+  --surface-2: #1e293b;
+  --border: #2b3750;
+  --border-strong: #46557a;
+  --text: #e8ecf4;
+  --text-muted: #a3aec6;
+  --primary: #3b6fe0;
+  --primary-hover: #4d7ee8;
+  --on-primary: #ffffff;
+  --primary-text: #9bb9ff;
+  --primary-soft: #1b2a50;
+  --positive-text: #5eead4;
+  --positive-bg: #0f2c30;
+  --warn-text: #fcd34d;
+  --warn-bg: #36280c;
+  --danger-text: #fca5a5;
+  --danger-bg: #3b1519;
+  --focus: #9bb9ff;
+}
