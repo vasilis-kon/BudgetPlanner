@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>BudgetPlanner interaction tests</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 1rem; }
+    .pass { color: #0b6b62; } .fail { color: #b01c1c; font-weight: 700; }
+    pre { white-space: pre-wrap; }
+    #stage { position: absolute; left: -9999px; width: 1000px; }
+  </style>
+</head>
+<body>
+  <h1>Interaction tests</h1>
+  <p>Clicks, types and submits in the real pages and checks what is saved and shown.</p>
+  <pre id="out">Running…</pre>
+  <div id="stage"></div>
+  <script type="module" src="interact.test.js"></script>
+</body>
+</html>

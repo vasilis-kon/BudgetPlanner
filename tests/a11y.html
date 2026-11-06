@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>BudgetPlanner accessibility check</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 1rem; }
+    .pass { color: #0b6b62; } .fail { color: #b01c1c; font-weight: 700; }
+    pre { white-space: pre-wrap; }
+    iframe { position: absolute; left: -9999px; border: 0; }
+  </style>
+</head>
+<body>
+  <h1>Accessibility check (axe-core)</h1>
+  <p>Opens every page in light and dark mode, at laptop and phone width, and lists WCAG 2.1 A/AA problems. Needs internet once, to load axe-core.</p>
+  <pre id="out">Running…</pre>
+  <script type="module" src="a11y.test.js"></script>
+</body>
+</html>

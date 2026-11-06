@@ -100,3 +100,27 @@
   --danger-bg: #3b1519;
   --focus: #9bb9ff;
 }
+
+/* Chart and data colours. Each is at least 3:1 against the card surface, and charts also use
+   line styles and labels so colour is never the only cue. */
+:root {
+  --c-living: #64748b;
+  --c-goals: #b45309;
+  --c-installment: #6d28d9;
+  --c-invest: #0b6b62;
+  --c-bank: #1e40af;
+  --c-bonus: #be185d;
+  --c-loan: #b01c1c;
+  --c-buffer: #0369a1;
+  --c-fund: #a16207;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --c-living: #94a3b8; --c-goals: #fbbf24; --c-installment: #a78bfa; --c-invest: #5eead4;
+    --c-bank: #7aa2ff; --c-bonus: #f472b6; --c-loan: #fca5a5; --c-buffer: #38bdf8; --c-fund: #facc15;
+  }
+}
+:root[data-theme="dark"] {
+  --c-living: #94a3b8; --c-goals: #fbbf24; --c-installment: #a78bfa; --c-invest: #5eead4;
+  --c-bank: #7aa2ff; --c-bonus: #f472b6; --c-loan: #fca5a5; --c-buffer: #38bdf8; --c-fund: #facc15;
+}

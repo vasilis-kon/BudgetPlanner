@@ -16,6 +16,14 @@ const LOCALE = "en-GB";
 const money = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 2 });
 export const formatMoney = (n) => money.format(Math.abs(n) < 0.005 ? 0 : n);
 
+const whole = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+/** Whole euros, for projections where cents would be false precision. */
+export const formatWhole = (n) => whole.format(Math.abs(n) < 0.5 ? 0 : n);
+
+const compact = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "EUR", notation: "compact", maximumFractionDigits: 1 });
+/** Short money for chart axes: €120K. */
+export const formatCompact = (n) => compact.format(n);
+
 const monthFmt = new Intl.DateTimeFormat(LOCALE, { month: "long", year: "numeric", timeZone: "UTC" });
 const monthShortFmt = new Intl.DateTimeFormat(LOCALE, { month: "short", timeZone: "UTC" });
 export function formatMonth(key) {

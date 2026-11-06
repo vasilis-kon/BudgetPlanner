@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Load sample data</title>
+</head>
+<body>
+  <p>Loading sample data into this browser and opening the app…</p>
+  <script type="module">
+    // Developer helper: fills localStorage with a realistic plan, then opens the app.
+    // Usage: tests/seed.html?route=house&variant=full   (variants: empty, basic, full)
+    // It overwrites the saved data in this browser, so use it only on a test profile.
+    import { buildSample } from "./sample.js";
+    const q = new URLSearchParams(location.search);
+    const state = buildSample(q.get("variant") || "full", { theme: q.get("theme") || "system" });
+    localStorage.setItem("budgetplanner:v1", JSON.stringify(state));
+    location.replace("../index.html#/" + (q.get("route") || "home"));
+  </script>
+</body>
+</html>

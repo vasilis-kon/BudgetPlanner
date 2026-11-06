@@ -12,11 +12,15 @@ The full specification is in [docs/website-map.md](docs/website-map.md).
 
 ## Status
 
-| Page | State |
+| Page | What it does |
 | --- | --- |
-| Home | "Who this is for" note; roadmap timeline still to come |
-| Monthly Budget | Built |
-| Goals, House Planner, Overview | Placeholders |
+| Home | Your roadmap: goals, life events, deposit ready, house purchase, end of the fixed-rate period and debt-free on one timeline, with a "you are here" marker. Each step opens the page it belongs to. |
+| Monthly Budget | Salary (changes apply from a chosen month), categories with icons, planned vs. actual, bonus share, free money, and the lines approved goals add. |
+| Goals | Any number of goals. Each is checked against free money, shows how it moves the deposit date, and joins the budget once approved. |
+| House Planner | Your expected future (salary steps, cost steps, life events, installment check), then Stage A save the deposit, Stage B size the loan, Stage C invest until debt-free, with charts. |
+| Overview | Bank, investments and loan at the end of each year, one timeline bar, and a year-by-year table. |
+
+The plan ends when you are debt-free: the month your investments, after tax on gains, cover what is still owed on the loan.
 
 ## How it works
 
@@ -28,14 +32,16 @@ index.html          one page, hash routes (#/home, #/budget, #/goals, #/house, #
 css/                tokens.css (colours, type, spacing), base, layout, components
 js/app.js           start-up and router
 js/store.js         saved data, load/save, export/import
-js/calc/            money logic as pure functions (no DOM)
+js/calc/            money logic as pure functions (no DOM): budget, goals, loan, projection, roadmap
 js/pages/           one file per page
-js/components/      shared UI pieces (icons, money input, month field)
+js/components/      shared UI pieces (icons, money input, month field, charts, formatting)
+js/vendor/          Chart.js 4.4.7, copied in so the site needs no CDN
+tests/              calculation, page, interaction and accessibility checks (see below)
 js/i18n/en.js       all interface text
 legacy/             the first prototype
 ```
 
-Icons are from [Lucide](https://lucide.dev) (v0.468.0), copied into `js/components/icon.js`. Charts will use Chart.js at an exact pinned version once they are needed.
+Icons are from [Lucide](https://lucide.dev) (v0.468.0), copied into `js/components/icon.js`. Charts use [Chart.js](https://www.chartjs.org) 4.4.7, kept in `js/vendor/` at that exact version.
 
 ## Run it locally
 
@@ -46,6 +52,20 @@ python -m http.server 8000
 ```
 
 then open <http://localhost:8000>. (Alternatives: `npx serve`, or the VS Code "Live Server" extension.)
+
+## Run the checks
+
+With the local server running, open these pages in a browser. Each lists PASS or FAIL lines.
+
+| Page | Checks |
+| --- | --- |
+| <http://localhost:8000/tests/> | The money maths (loan, goals, projection, roadmap) and that every piece of interface text exists |
+| <http://localhost:8000/tests/pages.html> | Every page draws from sample data without errors |
+| <http://localhost:8000/tests/interact.html> | Typing, clicking and submitting in the real pages |
+| <http://localhost:8000/tests/a11y.html> | WCAG 2.1 A/AA accessibility (axe-core, needs internet) in light and dark mode, laptop and phone width |
+| <http://localhost:8000/tests/overflow.html> | Nothing is wider than a phone screen |
+
+`tests/seed.html?route=house&variant=full` fills the browser with a sample plan (it overwrites your saved data, so use a spare browser profile).
 
 ## Publish on GitHub Pages
 

@@ -89,8 +89,11 @@ export function effectiveSpend(months, catId, key) {
   return a !== null ? a : plannedFor(months, catId, key).amount;
 }
 
-/** Everything the Monthly Budget page shows for one month. */
-export function summarizeMonth({ salarySteps, categoryIds, months, bonusSharePct }, key) {
+/**
+ * Everything the Monthly Budget page shows for one month.
+ * `goalTotal` is what approved goals take out of the month (monthly allocations and ongoing costs).
+ */
+export function summarizeMonth({ salarySteps, categoryIds, months, bonusSharePct, goalTotal = 0 }, key) {
   const salary = salaryFor(salarySteps, key);
   let planned = 0, actual = 0, spent = 0, loggedCount = 0;
   for (const id of categoryIds) {
@@ -107,8 +110,9 @@ export function summarizeMonth({ salarySteps, categoryIds, months, bonusSharePct
     actual,
     spent,
     loggedCount,
-    free: salary - spent,
-    freeIfPlanned: salary - planned,
+    goalTotal,
+    free: salary - spent - goalTotal,
+    freeIfPlanned: salary - planned - goalTotal,
     bonus: bonus && { ...bonus, ...splitBonus(bonus.amount, bonusSharePct) },
   };
 }

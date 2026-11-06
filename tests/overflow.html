@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Phone width overflow check</title></head>
+<body>
+<h1>Phone width overflow check</h1>
+<p>Loads every page at 390px wide and lists anything wider than the screen.</p>
+<pre id="out">Running…</pre>
+<iframe id="f" style="position:absolute;left:-9999px;width:390px;height:900px;border:0"></iframe>
+<script type="module">
+  import { buildSample } from "./sample.js";
+  const q = new URLSearchParams(location.search);
+  const routes = q.get("route") ? [q.get("route")] : ["home", "budget", "goals", "house", "overview"];
+  const f = document.getElementById("f");
+  const lines = [];
+  for (const route of routes) {
+    localStorage.setItem("budgetplanner:v1", JSON.stringify(buildSample("full", { theme: "light" })));
+    await new Promise((r) => { f.onload = r; f.src = `../index.html#/${route}`; });
+    await new Promise((r) => setTimeout(r, 1200));
+    const d = f.contentDocument, W = d.documentElement.clientWidth;
+    d.querySelectorAll("details").forEach((x) => (x.open = true));
+    const bad = [];
+    d.querySelectorAll("main *").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width && r.right > W + 1 && !el.closest(".table-scroll, canvas")) bad.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : ""} right=${Math.round(r.right)}`);
+    });
+    const page = d.documentElement.scrollWidth;
+    lines.push(`${page > W ? "FAIL" : "PASS"} ${route}: page ${page}px vs screen ${W}px${bad.length ? "\n   " + [...new Set(bad)].slice(0, 12).join("\n   ") : ""}`);
+  }
+  document.getElementById("out").textContent = lines.join("\n");
+</script></body></html>

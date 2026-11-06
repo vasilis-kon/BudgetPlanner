@@ -1,5 +1,6 @@
 // Saved data: one object in localStorage under one versioned key, plus JSON export/import.
-import { isMonthKey } from "./calc/budget.js";
+import { isMonthKey, monthsBetween } from "./calc/budget.js";
+import { goalPlan, PAYBACK_TARGETS } from "./calc/goals.js";
 
 export const STORAGE_KEY = "budgetplanner:v1";
 export const VERSION = 1;
@@ -17,7 +18,26 @@ export const DEFAULT_CATEGORIES = [
   { id: "other", icon: "circle-ellipsis", builtin: true },
 ];
 
-/** Shape of everything we save. goals/house are empty until those pages are built. */
+/** Starting values for the House Planner. `amount` stays empty until the user enters a price or loan. */
+export function defaultHouse() {
+  return {
+    mode: "price", // which figure the user enters: "price" or "loan"
+    amount: null,
+    ltvPct: 80,
+    costsPct: 7,
+    buffer: 5000,
+    loan: { type: "fixed", termYears: 20, rate: 4.2, fixedYears: 5, fixedRate: 3.5, variableRate: 4.5, homeCosts: 120 },
+    invest: { sharePct: 50, returnPct: 8, feePct: 0.07, taxPct: 15 },
+    support: { on: false, type: "room", rent: 400, emptyMonths: 1, taxPct: 15, years: 20, partnerAmount: 300, partnerStart: null, partnerEnd: null },
+    inflationPct: 2.5, // only used to show amounts in today's euros
+    units: "future", // "future" or "today"
+    salarySteps: [], // [{ id, from, amount }] expected new net salary from a month
+    costSteps: [], // [{ id, from, catId, amount }] expected new monthly amount for a category from a month
+    events: [], // [{ id, name, start, end|null, salary|null, costs: { catId: amount } }]
+  };
+}
+
+/** Shape of everything we save. */
 export function emptyState() {
   return {
     version: VERSION,
@@ -25,8 +45,8 @@ export function emptyState() {
     salary: [], // [{ from: "YYYY-MM", amount }]
     categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })),
     months: {}, // { "YYYY-MM": { planned: { catId: €ish }, actual: { catId: € } } }
-    goals: [],
-    house: {},
+    goals: [], // [{ id, approved, data: goal fields | null, draft: goal fields | null }]
+    house: defaultHouse(),
   };
 }
 
@@ -69,9 +89,107 @@ export function sanitize(raw) {
       s.months[k] = out;
     }
   }
-  if (Array.isArray(raw.goals)) s.goals = raw.goals;
-  if (raw.house && typeof raw.house === "object") s.house = raw.house;
+  s.goals = sanitizeGoals(raw.goals);
+  s.house = sanitizeHouse(raw.house, valid);
   return s;
+}
+
+/* ---------- goals and house: clean any object into the exact shape the pages expect ---------- */
+
+const clamp = (v, lo, hi, fallback) => (num(v) ? Math.min(hi, Math.max(lo, v)) : fallback);
+const monthOrNull = (v) => (isMonthKey(v) ? v : null);
+const text = (v, max) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+const idOf = (v) => (typeof v === "string" && /^[\w-]{1,40}$/.test(v) ? v : newId());
+const amountOrNull = (v) => (num(v) && v >= 0 ? Math.round(v * 100) / 100 : null);
+
+export function goalFields(f) {
+  f = f && typeof f === "object" ? f : {};
+  return {
+    name: text(f.name, 60),
+    start: monthOrNull(f.start),
+    target: monthOrNull(f.target),
+    amount: amountOrNull(f.amount),
+    mode: f.mode === "custom" ? "custom" : "auto",
+    monthly: amountOrNull(f.monthly),
+    ongoing: amountOrNull(f.ongoing) ?? 0,
+    paybackAmount: amountOrNull(f.paybackAmount) ?? 0,
+    paybackTo: PAYBACK_TARGETS.includes(f.paybackTo) ? f.paybackTo : "deposit",
+  };
+}
+
+export function sanitizeGoals(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const g of raw) {
+    if (!g || typeof g !== "object") continue;
+    let id = idOf(g.id);
+    while (seen.has(id)) id = newId();
+    seen.add(id);
+    let data = g.data ? goalFields(g.data) : null;
+    let draft = g.draft ? goalFields(g.draft) : null;
+    let approved = g.approved === true && data !== null && data.name !== "" && goalPlan(data).valid;
+    if (!approved) { draft = draft || data || goalFields({}); data = null; }
+    out.push({ id, approved, data: approved ? data : null, draft });
+  }
+  return out;
+}
+
+function stepList(raw, build) {
+  return (Array.isArray(raw) ? raw : []).map(build).filter(Boolean).sort((a, b) => a.from.localeCompare(b.from));
+}
+
+export function sanitizeHouse(raw, validCats) {
+  const d = defaultHouse();
+  const h = raw && typeof raw === "object" ? raw : {};
+  const L = h.loan || {}, I = h.invest || {}, S = h.support || {};
+  const cats = validCats || new Set();
+  d.mode = h.mode === "loan" ? "loan" : "price";
+  d.amount = num(h.amount) && h.amount > 0 ? h.amount : null;
+  d.ltvPct = clamp(h.ltvPct, 1, 100, d.ltvPct);
+  d.costsPct = clamp(h.costsPct, 0, 30, d.costsPct);
+  d.buffer = clamp(h.buffer, 0, 1e7, d.buffer);
+  d.loan = {
+    type: L.type === "mixed" ? "mixed" : "fixed",
+    termYears: clamp(L.termYears, 1, 40, d.loan.termYears),
+    rate: clamp(L.rate, 0, 25, d.loan.rate),
+    fixedYears: clamp(L.fixedYears, 0, 40, d.loan.fixedYears),
+    fixedRate: clamp(L.fixedRate, 0, 25, d.loan.fixedRate),
+    variableRate: clamp(L.variableRate, 0, 25, d.loan.variableRate),
+    homeCosts: clamp(L.homeCosts, 0, 1e5, d.loan.homeCosts),
+  };
+  d.invest = {
+    sharePct: clamp(I.sharePct, 0, 100, d.invest.sharePct),
+    returnPct: clamp(I.returnPct, -20, 30, d.invest.returnPct),
+    feePct: clamp(I.feePct, 0, 5, d.invest.feePct),
+    taxPct: clamp(I.taxPct, 0, 60, d.invest.taxPct),
+  };
+  const ps = monthOrNull(S.partnerStart), pe = monthOrNull(S.partnerEnd);
+  d.support = {
+    on: S.on === true,
+    type: S.type === "partner" ? "partner" : "room",
+    rent: clamp(S.rent, 0, 1e5, d.support.rent),
+    emptyMonths: clamp(S.emptyMonths, 0, 12, d.support.emptyMonths),
+    taxPct: clamp(S.taxPct, 0, 60, d.support.taxPct),
+    years: clamp(S.years, 0, 50, d.support.years),
+    partnerAmount: clamp(S.partnerAmount, 0, 1e5, d.support.partnerAmount),
+    partnerStart: ps,
+    partnerEnd: ps && pe && pe > ps ? pe : null,
+  };
+  d.inflationPct = clamp(h.inflationPct, 0, 20, d.inflationPct);
+  d.units = h.units === "today" ? "today" : "future";
+  d.salarySteps = stepList(h.salarySteps, (x) =>
+    x && isMonthKey(x.from) && num(x.amount) && x.amount > 0 ? { id: idOf(x.id), from: x.from, amount: x.amount } : null);
+  d.costSteps = stepList(h.costSteps, (x) =>
+    x && isMonthKey(x.from) && cats.has(x.catId) && num(x.amount) && x.amount >= 0 ? { id: idOf(x.id), from: x.from, catId: x.catId, amount: x.amount } : null);
+  d.events = (Array.isArray(h.events) ? h.events : []).map((e) => {
+    if (!e || !isMonthKey(e.start) || !text(e.name, 60)) return null;
+    const costs = {};
+    for (const [c, v] of Object.entries(e.costs || {})) if (cats.has(c) && num(v) && v >= 0) costs[c] = v;
+    const end = isMonthKey(e.end) && monthsBetween(e.start, e.end) > 0 ? e.end : null;
+    return { id: idOf(e.id), name: text(e.name, 60), start: e.start, end, salary: num(e.salary) && e.salary >= 0 ? e.salary : null, costs };
+  }).filter(Boolean).sort((a, b) => a.start.localeCompare(b.start));
+  return d;
 }
 
 export function load() {
@@ -127,6 +245,10 @@ export function importJson(text) {
   return true;
 }
 
+export function newId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
 export function categoryId() {
-  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  return "c" + newId();
 }

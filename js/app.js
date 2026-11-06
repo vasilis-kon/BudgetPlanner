@@ -64,6 +64,7 @@ function applyTheme() {
   const th = store.getState().settings.theme;
   if (th === "system") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", th);
+  window.dispatchEvent(new Event("bp-theme")); // charts redraw in the new colours
 }
 function updateThemeButton() {
   const dark = isDark();
@@ -143,7 +144,7 @@ function start() {
   $("skip-link").addEventListener("click", (e) => { e.preventDefault(); $("main").focus(); });
   renderHeader();
   renderFooter();
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", updateThemeButton);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { updateThemeButton(); window.dispatchEvent(new Event("bp-theme")); });
   store.subscribe(updateBanner);
   window.addEventListener("hashchange", onHashChange);
   if (!location.hash) history.replaceState(null, "", "#/" + DEFAULT_ROUTE);

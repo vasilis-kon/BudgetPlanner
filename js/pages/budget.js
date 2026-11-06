@@ -9,8 +9,9 @@ import {
   BONUS_MONTHS, addMonths, isMonthKey, monthKey, parseMonth,
   salaryFor, plannedFor, actualFor, summarizeMonth, bonusFor, splitBonus,
 } from "../calc/budget.js";
+import { approvedGoals, goalLinesFor } from "../calc/goals.js";
 
-const PLAN_MONTHS = 120; // the planner covers 10 years from the start month
+const PLAN_MONTHS = 360; // the month picker covers 30 years from the start month
 let selected = null; // month being viewed; kept while moving between pages
 
 const catName = (c) => (c.builtin ? t("cat." + c.id) : c.name);
@@ -25,10 +26,12 @@ export function render(root) {
   const $ = (sel) => wrap.querySelector(sel);
 
   const state = () => store.getState();
+  /** Lines approved goals add to the selected month: monthly allocations and ongoing costs. */
+  const goalLines = () => goalLinesFor(approvedGoals(state().goals), selected);
   const summary = () => {
     const st = state();
     return summarizeMonth(
-      { salarySteps: st.salary, categoryIds: st.categories.map((c) => c.id), months: st.months, bonusSharePct: st.settings.bonusSharePct },
+      { salarySteps: st.salary, categoryIds: st.categories.map((c) => c.id), months: st.months, bonusSharePct: st.settings.bonusSharePct, goalTotal: goalLines().total },
       selected
     );
   };
@@ -67,9 +70,28 @@ export function render(root) {
         <p class="stat-value">${eur(sum.free)}</p>
         <p class="stat-sub" role="status">${icon(cls === "positive" ? "check" : "triangle-alert", { size: 16 })} ${status}</p>
         <p class="stat-sub">${basis}</p>
-        <p class="stat-sub">${t("budget.free.salary")} ${eur(sum.salary)} − ${t("budget.free.spent")} ${eur(sum.spent)}</p>
+        <p class="stat-sub">${t("budget.free.salary")} ${eur(sum.salary)} − ${t("budget.free.spent")} ${eur(sum.spent)} − ${t("budget.free.goals")} ${eur(sum.goalTotal)}</p>
         <p class="stat-sub">${t("budget.free.goalsNote")}</p>`,
     };
+  }
+
+  function goalsHtml() {
+    const { lines, total } = goalLines();
+    if (!lines.length) {
+      return `
+        <div class="card-head">${icon("target")}<h2 id="goals-h">${t("budget.goals.title")}</h2></div>
+        <p class="muted">${t("budget.goals.none")} <a href="#/goals">${t("budget.goals.link")}</a></p>`;
+    }
+    const rows = lines.map((l) => `
+      <li>
+        <span class="left"><span class="cat-icon">${icon(l.kind === "goal" ? "target" : "wrench")}</span><span>${esc(l.name)} <span class="muted small">· ${t(l.kind === "goal" ? "budget.goals.kindGoal" : "budget.goals.kindOngoing")}</span></span></span>
+        <strong class="num">${eur(l.amount)}</strong>
+      </li>`).join("");
+    return `
+      <div class="card-head">${icon("target")}<h2 id="goals-h">${t("budget.goals.title")}</h2></div>
+      <p class="muted">${t("budget.goals.intro", { month: formatMonth(selected) })}</p>
+      <ul class="simple-list">${rows}</ul>
+      <p class="stat-sub"><strong>${t("budget.goals.total")}: ${eur(total)}</strong> · <a href="#/goals">${t("budget.goals.manage")}</a></p>`;
   }
 
   function salaryHtml(sum) {
@@ -236,6 +258,7 @@ export function render(root) {
           <section class="card free-card ${free.cls}" id="free-card" aria-labelledby="free-h">${free.html}</section>
           <section class="card" id="salary-card" aria-labelledby="salary-h">${salaryHtml(sum)}</section>
         </div>
+        <section class="card" id="goals-card" aria-labelledby="goals-h">${goalsHtml()}</section>
         <section class="card" id="expenses-card" aria-labelledby="exp-h">${expensesHtml()}</section>
         <section class="card" aria-labelledby="bonus-h">
           <div class="card-head">${icon("gift")}<h2 id="bonus-h">${t("budget.bonus.title")}</h2></div>
@@ -337,6 +360,9 @@ export function render(root) {
       store.update((s) => {
         s.categories = s.categories.filter((c) => c.id !== cat.id);
         for (const m of Object.values(s.months)) { delete m.planned[cat.id]; delete m.actual[cat.id]; }
+        // Expected cost changes in the House Planner that point at this category go too.
+        s.house.costSteps = s.house.costSteps.filter((x) => x.catId !== cat.id);
+        for (const e of s.house.events) delete e.costs[cat.id];
       });
       draw("#cat-name");
     }
