@@ -2,8 +2,8 @@
 // No test framework: each test throws on failure and the page lists PASS/FAIL.
 import { addMonths, monthsBetween, summarizeMonth } from "../js/calc/budget.js";
 import { pmt, createLoan, loanSummary, affordability, loanForPayment } from "../js/calc/loan.js";
-import { goalPlan, goalContribution, goalLinesFor, checkGoal, approvedGoals } from "../js/calc/goals.js";
-import { prepare, project, houseFinance, inputFromState, supportSweep, loanMonths, todayFactor, newShortfalls, cutAdvice, isFlexible } from "../js/calc/projection.js";
+import { goalPlan, goalContribution, goalLinesFor, checkGoal, approvedGoals, replacedCategories, budgetFreeFn } from "../js/calc/goals.js";
+import { prepare, project, houseFinance, inputFromState, supportSweep, loanMonths, todayFactor, newShortfalls, cutAdvice, isFlexible, monthPicture, plannedDetail } from "../js/calc/projection.js";
 import { emptyState, sanitize, defaultHouse, goalFields } from "../js/store.js";
 
 const results = [];
@@ -424,6 +424,101 @@ test("in today's euros the retirement-year net worth is smaller than in future e
   const r = run(withAge(30));
   const last = r.years[r.years.length - 1];
   is(last.real.netWorth < last.nom.netWorth, "deflated value must be smaller");
+});
+
+/* ---------- the Monthly Budget and the House Planner are one plan ---------- */
+/** A plan with every kind of change: an expected raise, a cost step, a life event, and a car that replaces transport. */
+function richState() {
+  const st = baseState();
+  st.months[TODAY].planned = { rent: 600, groceries: 300, transport: 100, utilities: 120 };
+  st.goals = [{ id: "car", approved: true, draft: null, data: goalFields({ name: "Car", start: "2027-01", target: "2028-01", amount: 3600, ongoing: 90, replaces: "transport" }) }];
+  st.house.salarySteps = [{ id: "s1", from: "2031-09", amount: 2500 }];
+  st.house.costSteps = [{ id: "c1", from: "2030-01", catId: "groceries", amount: 350 }];
+  st.house.events = [{ id: "e1", name: "Reduced hours", start: "2033-01", end: "2033-05", salary: 1800, costs: { groceries: 250 } }];
+  st.house.age = 40;
+  return st;
+}
+test("the Monthly Budget shows the same free money as the House Planner in every month", () => {
+  const st = richState(); const inp = inputFromState(st, TODAY); const prep = prepare(inp); const r = project(inp, prep);
+  is(r.rows.length > 200, "a long plan to compare");
+  for (const row of r.rows) {
+    const pic = monthPicture(inp, prep, r, row.key);
+    if (Math.abs(pic.free - row.leftover) > 0.01) throw new Error(`${row.key}: budget page ${pic.free.toFixed(2)} vs planner ${row.leftover.toFixed(2)}`);
+  }
+});
+test("the Monthly Budget uses the expected salary step, cost step and life event, like the planner", () => {
+  const st = richState(); const inp = inputFromState(st, TODAY); const prep = prepare(inp); const r = project(inp, prep);
+  const pic = (k) => monthPicture(inp, prep, r, k);
+  eq(pic("2031-08").salary, 2000); eq(pic("2031-09").salary, 2500, "salary step shows in the budget");
+  eq(pic("2031-09").salaryFrom.kind, "step"); eq(pic("2031-08").salaryFrom, null);
+  eq(pic("2033-02").salary, 1800, "the life event's salary shows"); eq(pic("2033-02").salaryFrom.kind, "event");
+  eq(pic("2033-06").salary, 2500, "back to the raised salary after the event");
+  eq(plannedDetail(inp, "groceries", "2029-12").amount, 300); eq(plannedDetail(inp, "groceries", "2030-01").amount, 350);
+  eq(plannedDetail(inp, "groceries", "2033-02").amount, 250); eq(plannedDetail(inp, "groceries", "2033-02").source, "event");
+  eq(plannedDetail(inp, "groceries", "2030-01").source, "step"); eq(plannedDetail(inp, "groceries", "2030-01").stepFrom, "2030-01");
+});
+test("the scenario from the bug report: salary step makes the month affordable, so the budget must not show a shortfall", () => {
+  const st = baseState(); st.house.amount = 300000; st.house.salarySteps = [{ id: "s1", from: "2030-01", amount: 3200 }];
+  const inp = inputFromState(st, TODAY); const prep = prepare(inp); const r = project(inp, prep);
+  eq(r.feasible, true, "the planner says every month is covered");
+  for (const row of r.rows) is(monthPicture(inp, prep, r, row.key).free >= -0.01, "budget page agrees at " + row.key);
+});
+test("plannedDetail agrees with the planner's own amounts for every future month and category", () => {
+  const st = richState(); const inp = inputFromState(st, TODAY); const prep = prepare(inp);
+  for (let i = 1; i < 200; i++) for (let k = 0; k < prep.categoryIds.length; k++) {
+    const d = plannedDetail(inp, prep.categoryIds[k], prep.keys[i]).amount;
+    if (Math.abs(d - prep.amounts[i][k]) > 1e-9) throw new Error(`${prep.keys[i]} ${prep.categoryIds[k]}: ${d} vs ${prep.amounts[i][k]}`);
+  }
+});
+test("a goal can replace an expense: a car replaces transport from the month it is bought", () => {
+  const st = richState(); const inp = inputFromState(st, TODAY);
+  const withCar = project(inp);
+  const noReplace = richState(); noReplace.goals[0].data.replaces = null;
+  const without = project(inputFromState(noReplace, TODAY));
+  const at = (r, k) => r.rows.find((x) => x.key === k);
+  near(at(withCar, "2027-12").spend, at(without, "2027-12").spend, 1e-9, "before the car is bought transport is still paid");
+  near(at(without, "2028-01").spend - at(withCar, "2028-01").spend, 100, 1e-9, "from the car's month transport counts as zero");
+  near(at(without, "2029-05").spend - at(withCar, "2029-05").spend, 100, 1e-9, "and it stays zero");
+  is(at(withCar, "2028-06").ongoing === 90, "the car's running costs are still paid");
+});
+test("the car's replaced transport shows as zero in the Monthly Budget too, from the same month", () => {
+  const st = richState(); const inp = inputFromState(st, TODAY); const prep = prepare(inp); const r = project(inp, prep);
+  eq(monthPicture(inp, prep, r, "2027-12").replacedBy.transport, undefined);
+  eq(monthPicture(inp, prep, r, "2028-01").replacedBy.transport.kind, "goal");
+  eq(monthPicture(inp, prep, r, "2028-01").replacedBy.transport.name, "Car");
+  const a = monthPicture(inp, prep, r, "2027-12"), b = monthPicture(inp, prep, r, "2028-01");
+  near(a.spent - b.spent, 100, 1e-9, "100 less is spent");
+});
+test("a goal that replaces rent does not take rent off twice once the house is bought", () => {
+  const mk = (replaces) => { const st = baseState(); st.goals = [{ id: "g", approved: true, draft: null, data: goalFields({ name: "Move in", start: "2027-01", target: "2027-07", amount: 600, replaces }) }]; return project(inputFromState(st, TODAY)); };
+  const a = mk(null), b = mk("rent");
+  const key = addMonths(a.purchase, 5);
+  near(a.rows.find((x) => x.key === key).spend, b.rows.find((x) => x.key === key).spend, 1e-9, "same spend after the purchase");
+  is(a.rows.find((x) => x.key === "2027-09").spend - b.rows.find((x) => x.key === "2027-09").spend === 600, "but before the purchase it removes rent");
+});
+test("replacedCategories lists only goals that have been reached", () => {
+  const goals = approvedGoals(richState().goals);
+  eq(replacedCategories(goals, "2027-12").size, 0); eq(replacedCategories(goals, "2028-01").get("transport"), "Car");
+  eq(replacedCategories([{ ...goals[0], replaces: null }], "2030-01").size, 0);
+});
+test("the goal fit check counts the expense that another goal replaces", () => {
+  const st = richState(); const goals = approvedGoals(st.goals);
+  const budget = { salarySteps: st.salary, categoryIds: st.categories.map((c) => c.id), months: st.months, bonusSharePct: 50 };
+  const free = budgetFreeFn(budget, goals, "other");
+  // Month before the car: 300 still being saved. Month after: that saving has stopped (+300), transport is gone (+100), running costs begin (-90).
+  near(free("2028-02") - free("2027-12"), 300 + 100 - 90, 1e-9, "saving stops, transport gone, running costs added");
+});
+test("cut advice does not list an expense a goal has replaced", () => {
+  const st = richState(); st.months[TODAY].planned.rent = 1900; // overspends before the house
+  const inp = inputFromState(st, TODAY); const prep = prepare(inp); const r = project(inp, prep);
+  const p = r.problems.find((x) => x.from >= "2028-01") || r.problems[0];
+  is(r.problems.length > 0, "overspending exists");
+  const a = cutAdvice(inp, prep, r, { ...p, worstKey: "2028-03", worst: p.worst });
+  is(!a.categories.some((c) => c.id === "transport"), "transport is not offered as something to cut after the car");
+});
+test("a goal's replaced category is kept when valid and dropped when not", () => {
+  const ok = goalFields({ name: "Car", replaces: "transport" }); eq(ok.replaces, "transport");
+  eq(goalFields({ name: "Car", replaces: "bad id!" }).replaces, null); eq(goalFields({ name: "Car" }).replaces, null);
 });
 
 /* ---------- rent becomes zero once the loan is being paid ---------- */

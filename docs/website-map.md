@@ -20,6 +20,7 @@ BudgetPlanner helps salaried employees in Greece plan their monthly budget, save
 | Accounts | No sign-ins yet. Data is saved in the user's browser. |
 | Inflation | No automatic inflation on the budget, goals or installment. Inflation shows up through what users actually spend, which they log in the Monthly Budget. |
 | Salary | Salary never rises automatically. It changes only when the user sets a new amount from a given month; earlier months keep the old amount. |
+| Monthly Budget and House Planner | One plan. The Monthly Budget shows, for any month, the same salary (with expected raises and life events), planned amounts (with cost steps and life events) and free money that the House Planner uses, so the two cannot disagree. Cells set by a life event, or by a cost step starting that month, are locked and say where they come from. |
 | Rent | From the month the first loan installment is paid, the rent in the Monthly Budget counts as €0 (its fields are locked and say why). The loan installment and the home running costs appear as a "home" card and are taken off free money instead, so the Monthly Budget and the House Planner always agree. |
 | Monthly obligations | The budget, goals and loan installment are covered by the 12 regular salaries only, as banks assume. |
 | Bonus salaries | In the Christmas, Easter and summer bonus months, the user sets the share of the bonus that is saved. Before the house is bought it goes to the deposit (shown as the first priority); after, it goes to investments. The rest is assumed spent on gifts and holidays. |
@@ -86,6 +87,7 @@ No goals are built in. The user clicks **Add a goal** and a new goal box appears
 - Start month and target month
 - Amount needed at the target date (the final amount, no inflation added)
 - Optional ongoing monthly cost after the goal is reached
+- Optional expense the goal replaces once it is reached. For a car this is Transport: once the car is bought its running costs take over, so the transport budget counts as €0 from that month (in the Monthly Budget and in the plan).
 - Optional one-time payback after the goal (for example wedding cash gifts), sent to the deposit (default; not available once the house is bought), paying down the loan, or investments
 
 **How a goal is added:**

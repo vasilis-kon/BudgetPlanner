@@ -55,6 +55,12 @@ export function bonusFor(steps, key) {
   return { id: b.id, amount };
 }
 
+/** The bonus paid in a month when the salary in force is already known (it may come from the House Planner). */
+export function bonusForSalary(salary, key) {
+  const b = BONUS_MONTHS[parseMonth(key).month];
+  return b ? { id: b.id, amount: salary * b.multiple } : null;
+}
+
 /** Splits a bonus into the saved part and the part assumed spent. */
 export function splitBonus(bonusAmount, sharePct) {
   const share = Math.min(100, Math.max(0, sharePct)) / 100;
@@ -95,18 +101,18 @@ export function effectiveSpend(months, catId, key) {
  * Once the house is bought, `skipCategories` (rent) count as zero and `houseTotal` (the loan installment and the
  * home running costs) takes their place.
  */
-export function summarizeMonth({ salarySteps, categoryIds, months, bonusSharePct, goalTotal = 0, houseTotal = 0, skipCategories = [] }, key) {
-  const salary = salaryFor(salarySteps, key);
+export function summarizeMonth({ salarySteps, categoryIds, months, bonusSharePct, goalTotal = 0, houseTotal = 0, skipCategories = [], salaryOverride = null, plannedOverride = null }, key) {
+  const salary = salaryOverride !== null ? salaryOverride : salaryFor(salarySteps, key);
   let planned = 0, actual = 0, spent = 0, loggedCount = 0;
   for (const id of categoryIds) {
     if (skipCategories.includes(id)) continue;
-    const p = plannedFor(months, id, key).amount;
+    const p = plannedOverride ? plannedOverride(id) : plannedFor(months, id, key).amount;
     const a = actualFor(months, id, key);
     planned += p;
     if (a !== null) { actual += a; loggedCount++; }
     spent += a !== null ? a : p;
   }
-  const bonus = bonusFor(salarySteps, key);
+  const bonus = salaryOverride !== null ? bonusForSalary(salary, key) : bonusFor(salarySteps, key);
   return {
     salary,
     planned,

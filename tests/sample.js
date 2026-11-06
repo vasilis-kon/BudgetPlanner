@@ -23,7 +23,7 @@ export function buildSample(variant = "full", { theme = "system", now = new Date
   if (variant !== "empty") state.house = { mode: "price", amount: variant === "short" ? 300000 : 150000, ltvPct: 80, costsPct: 7, buffer: 5000 };
   if (variant === "full") {
     state.goals = [
-      { id: "car", approved: true, draft: null, data: { name: "Dream Car", start: plus(3), target: plus(15), amount: 3600, mode: "auto", monthly: null, ongoing: 90, paybackAmount: 0, paybackTo: "deposit" } },
+      { id: "car", approved: true, draft: null, data: { name: "Dream Car", start: plus(3), target: plus(15), amount: 3600, mode: "auto", monthly: null, ongoing: 90, paybackAmount: 0, paybackTo: "deposit", replaces: "transport" } },
       { id: "wed", approved: true, draft: null, data: { name: "Wedding", start: plus(12), target: plus(36), amount: 9600, mode: "auto", monthly: null, ongoing: 0, paybackAmount: 3000, paybackTo: "deposit" } },
       { id: "trip", approved: false, data: null, draft: { name: "Big trip", start: plus(1), target: plus(5), amount: 9000, mode: "auto", monthly: null, ongoing: 0, paybackAmount: 0, paybackTo: "deposit" } },
     ];

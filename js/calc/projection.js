@@ -12,9 +12,9 @@
 //  - Free money goes to approved goals first; what remains funds the deposit, then the loan and investing.
 //  - Debt-free = the portfolio, after tax on gains, covers the loan balance still owed.
 import {
-  BONUS_MONTHS, addMonths, monthsBetween, parseMonth, salaryFor, plannedFor, actualFor,
+  BONUS_MONTHS, addMonths, monthsBetween, parseMonth, salaryFor, plannedFor, actualFor, summarizeMonth,
 } from "./budget.js";
-import { goalPlan, goalContribution, goalLinesFor, paybackMonth, approvedGoals } from "./goals.js";
+import { goalPlan, goalContribution, goalLinesFor, replacedCategories, paybackMonth, approvedGoals } from "./goals.js";
 import { createLoan, loanSummary, affordability, loanForPayment, AFFORD_OK, AFFORD_MAX } from "./loan.js";
 
 export const HORIZON = 600; // months simulated from the plan start (50 years)
@@ -153,9 +153,10 @@ export function cutAdvice(inp, prep, r, problem) {
   const idx = Math.max(0, Math.min(prep.H - 1, monthsBetween(inp.start, key)));
   const row = r.rows.find((x) => x.key === key);
   const owns = Boolean(row && row.owns);
+  const replaced = replacedCategories(inp.goals, key);
   const categories = prep.categoryIds
     .map((id, k) => ({ id, amount: prep.amounts[idx][k], flexible: isFlexible(id) }))
-    .filter((c) => c.amount > 0 && !(owns && c.id === RENT_CATEGORY))
+    .filter((c) => c.amount > 0 && !(owns && c.id === RENT_CATEGORY) && !replaced.has(c.id))
     .sort((a, b) => b.amount - a.amount);
   const flexibleTotal = categories.filter((c) => c.flexible).reduce((a, c) => a + c.amount, 0);
   return { key, needed: problem.worst, owns, categories, flexibleTotal, enough: flexibleTotal + EPS >= problem.worst };
@@ -184,7 +185,9 @@ export function project(inp, prep = prepare(inp)) {
     for (let i = 0; i < H; i++) {
       const key = prep.keys[i];
       if (key < today) continue;
-      const left = prep.salary[i] - prep.spend[i] - goalLinesFor(goals, key).total;
+      let replaced = 0;
+      for (const c of replacedCategories(goals, key).keys()) { const k = prep.categoryIds.indexOf(c); if (k >= 0) replaced += prep.amounts[i][k]; }
+      const left = prep.salary[i] - (prep.spend[i] - replaced) - goalLinesFor(goals, key).total;
       if (left < -EPS) early.push({ key, kind: "expenses", short: -left });
     }
     out.problems = groupProblems(early);
@@ -231,11 +234,12 @@ export function project(inp, prep = prepare(inp)) {
 
     // Goals: allocations, ongoing costs, paybacks.
     let goalContrib = 0, ongoing = 0, payDeposit = 0, payInvest = 0, payLoan = 0;
+    const replacedIds = new Set(); // expenses that a reached goal replaces (a car replaces transport)
     for (const { g, plan } of goalDefs) {
       const c = goalContribution(plan, g, key);
       goalContrib += c;
       funds.set(g.id, funds.get(g.id) + c);
-      if (key >= plan.reach) { ongoing += g.ongoing || 0; funds.set(g.id, 0); }
+      if (key >= plan.reach) { ongoing += g.ongoing || 0; funds.set(g.id, 0); if (g.replaces) replacedIds.add(g.replaces); }
       if (g.paybackAmount > 0 && key === paybackMonth(plan)) {
         let to = g.paybackTo;
         if (to === "deposit" && owns) { to = "invest"; if (!fallbackSeen.has(g.id)) { fallbackSeen.add(g.id); out.paybackFallbacks.push(g.id); } }
@@ -249,7 +253,12 @@ export function project(inp, prep = prepare(inp)) {
     let partner = 0, room = 0;
     if (sup.on && sup.type === "partner" && key >= (sup.partnerStart ?? inp.start) && (sup.partnerEnd === null || key < sup.partnerEnd)) partner = sup.partnerAmount;
 
-    let spendNow = prep.spend[i];
+    // Expenses the plan no longer pays: what a reached goal replaces and, once the house is bought, rent.
+    const skip = new Set(replacedIds);
+    if (owns) skip.add(RENT_CATEGORY);
+    let removed = 0;
+    for (const c of skip) { const k = prep.categoryIds.indexOf(c); if (k >= 0) removed += prep.amounts[i][k]; }
+    let spendNow = prep.spend[i] - removed;
     let installment = 0, interest = 0, leftover, toBank, investedSalary = 0, short = 0, shortKind = null;
 
     if (!owns) {
@@ -270,7 +279,7 @@ export function project(inp, prep = prepare(inp)) {
         out.termEnd = addMonths(key, T.n - 1);
         if (T.mixed && T.fixedMonths < T.n) out.fixedEnd = addMonths(key, T.fixedMonths);
       }
-      spendNow = spendNow - prep.rent[i] + house.loan.homeCosts;
+      spendNow = spendNow + house.loan.homeCosts; // rent is already left out above
       const firstMonth = key === out.purchase;
       if (loan) { // after debt-free the loan is gone and there is no installment
         const step = loan.step(payLoan + (firstMonth ? pendingLoanPrepay : 0));
@@ -391,4 +400,55 @@ export function supportSweep(inp, prep, maxYears = 30) {
 /** Whole months from the purchase month to debt-free, counting both ends of the loan (null if none). */
 export function loanMonths(r) {
   return r.purchase && r.debtFree ? monthsBetween(r.purchase, r.debtFree) + 1 : null;
+}
+
+/**
+ * Where a category's planned amount for a month comes from: the Monthly Budget, an expected cost step, or a life event.
+ * Same rules as prepare(): a step beats a budget entry made in or before its month, and an active life event beats both.
+ */
+export function plannedDetail(inp, catId, key) {
+  const { months, house } = inp;
+  const p = plannedFor(months, catId, key);
+  let amount = p.amount, from = p.from, source = "budget", stepFrom = null, event = null;
+  const steps = (house.costSteps || []).filter((x) => x.catId === catId).sort((a, b) => a.from.localeCompare(b.from));
+  for (const st of steps) {
+    if (st.from <= key && (from === null || st.from >= from)) { amount = st.amount; from = st.from; source = "step"; stepFrom = st.from; }
+  }
+  const events = [...(house.events || [])].sort((a, b) => a.start.localeCompare(b.start));
+  for (const e of events) {
+    if (eventActive(e, key) && e.costs && e.costs[catId] !== undefined) { amount = e.costs[catId]; source = "event"; event = e.name; }
+  }
+  return { amount, source, stepFrom, event, budgetFrom: p.from };
+}
+
+/**
+ * Everything the Monthly Budget shows for one month, built from the same plan as the House Planner so the two can
+ * never disagree: the salary with the user's expected raises and life events, planned amounts with cost steps and
+ * life events, goals, what a reached goal replaces, and (once the loan has started) the installment and home costs in place of rent.
+ */
+export function monthPicture(inp, prep, r, key) {
+  const idx = Math.max(0, Math.min(prep.H - 1, monthsBetween(inp.start, key)));
+  const salary = prep.salary[idx];
+  const goalLines = goalLinesFor(inp.goals, key);
+  const owns = Boolean(r.fin && r.fin.ok && r.purchase && key >= r.purchase);
+  const row = owns ? r.rows.find((x) => x.key === key) : null;
+  const house = owns ? { installment: row ? row.installment : 0, homeCosts: inp.house.loan.homeCosts, purchase: r.purchase } : null;
+  const replacedBy = {};
+  for (const [id, name] of replacedCategories(inp.goals, key)) replacedBy[id] = { kind: "goal", name };
+  if (owns) replacedBy[RENT_CATEGORY] = { kind: "home" };
+  const summary = summarizeMonth({
+    salarySteps: inp.salarySteps, categoryIds: inp.categoryIds, months: inp.months, bonusSharePct: inp.bonusSharePct,
+    goalTotal: goalLines.total,
+    houseTotal: house ? house.installment + house.homeCosts : 0,
+    skipCategories: Object.keys(replacedBy),
+    salaryOverride: salary,
+    plannedOverride: (id) => plannedDetail(inp, id, key).amount,
+  }, key);
+  // Where the salary comes from, so the page can say when it is not the one typed in the Monthly Budget.
+  let salaryFrom = null;
+  if (Math.abs(salary - salaryFor(inp.salarySteps, key)) > EPS) {
+    const ev = [...(inp.house.events || [])].sort((a, b) => a.start.localeCompare(b.start)).filter((e) => eventActive(e, key) && e.salary !== null).pop();
+    salaryFrom = ev ? { kind: "event", name: ev.name } : { kind: "step" };
+  }
+  return { ...summary, goalLines, house, replacedBy, salaryFrom };
 }

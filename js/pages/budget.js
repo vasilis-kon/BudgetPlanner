@@ -6,11 +6,10 @@ import { moneyInput } from "../components/money-input.js";
 import { monthField } from "../components/month-picker.js";
 import * as store from "../store.js";
 import {
-  BONUS_MONTHS, addMonths, isMonthKey, monthKey, parseMonth,
-  salaryFor, plannedFor, actualFor, summarizeMonth, bonusFor, splitBonus,
+  BONUS_MONTHS, addMonths, isMonthKey, monthKey, monthsBetween, parseMonth,
+  actualFor, bonusForSalary, splitBonus,
 } from "../calc/budget.js";
-import { approvedGoals, goalLinesFor } from "../calc/goals.js";
-import { inputFromState, prepare, project, RENT_CATEGORY } from "../calc/projection.js";
+import { inputFromState, prepare, project, monthPicture, plannedDetail } from "../calc/projection.js";
 
 const PLAN_MONTHS = 360; // the month picker covers 30 years from the start month
 let selected = null; // month being viewed; kept while moving between pages
@@ -28,41 +27,24 @@ export function render(root) {
 
   const state = () => store.getState();
 
-  /* ---------- the house: from the month the loan starts, rent is replaced by the installment and home costs ---------- */
-  let housePlan = null;
-  let drawnOwns = false; // whether the month on screen was drawn as "after the purchase"
-  function computeHouse() {
+  /* ---------- the plan behind each month: the very numbers the House Planner uses ---------- */
+  let plan = null; // { inp, prep, r }
+  let pic = null; // what the selected month looks like (salary, planned amounts, goals, home, replaced expenses, free money)
+  let drawnKey = ""; // which expenses were replaced when this month was drawn
+  function computePlan() {
     const st = state();
-    if (!st.settings.startMonth) { housePlan = null; return; }
+    if (!st.settings.startMonth) { plan = null; pic = null; return; }
     const inp = inputFromState(st, currentMonth());
-    const r = project(inp, prepare(inp));
-    housePlan = r.fin.ok && r.purchase
-      ? { purchase: r.purchase, rows: new Map(r.rows.map((x) => [x.key, x])), homeCosts: st.house.loan.homeCosts }
-      : null;
+    const prep = prepare(inp);
+    plan = { inp, prep, r: project(inp, prep) };
+    pic = monthPicture(inp, prep, plan.r, selected);
   }
-  /** What the house costs in a month, or null before the purchase (and when no house is planned). */
-  const houseFor = (key) => {
-    if (!housePlan || key < housePlan.purchase) return null;
-    const row = housePlan.rows.get(key);
-    return { installment: row ? row.installment : 0, homeCosts: housePlan.homeCosts, purchase: housePlan.purchase };
-  };
-  const rentReplaced = (catId) => catId === RENT_CATEGORY && Boolean(houseFor(selected));
-
-  /** Lines approved goals add to the selected month: monthly allocations and ongoing costs. */
-  const goalLines = () => goalLinesFor(approvedGoals(state().goals), selected);
-  const summary = () => {
-    const st = state();
-    const hf = houseFor(selected);
-    return summarizeMonth(
-      {
-        salarySteps: st.salary, categoryIds: st.categories.map((c) => c.id), months: st.months, bonusSharePct: st.settings.bonusSharePct,
-        goalTotal: goalLines().total,
-        houseTotal: hf ? hf.installment + hf.homeCosts : 0,
-        skipCategories: hf ? [RENT_CATEGORY] : [],
-      },
-      selected
-    );
-  };
+  const replacedKey = () => Object.keys(pic.replacedBy).sort().join(",");
+  const replacement = (catId) => pic.replacedBy[catId] || null;
+  const replacedText = (rep) => (rep.kind === "home" ? t("budget.expenses.rentReplaced") : t("budget.expenses.goalReplaced", { goal: esc(rep.name) }));
+  const salaryOn = (key) => plan.prep.salary[Math.max(0, Math.min(plan.prep.H - 1, monthsBetween(plan.inp.start, key)))];
+  const goalLines = () => pic.goalLines;
+  const summary = () => pic;
 
   /* ---------- HTML pieces ---------- */
 
@@ -84,7 +66,7 @@ export function render(root) {
   }
 
   function freeInner(sum) {
-    const total = state().categories.length - (houseFor(selected) ? 1 : 0); // rent is not counted once it is replaced
+    const total = state().categories.length - Object.keys(pic.replacedBy).length; // replaced expenses are not counted
     const cls = sum.free > 0.005 ? "positive" : sum.free < -0.005 ? "negative" : "zero";
     const status = cls === "positive" ? t("budget.free.positive") : cls === "zero" ? t("budget.free.zero") : t("budget.free.negative", { amount: eur(-sum.free) });
     const basis = sum.loggedCount === 0 ? t("budget.free.basisPlan")
@@ -105,7 +87,7 @@ export function render(root) {
   }
 
   function homeHtml() {
-    const hf = houseFor(selected);
+    const hf = pic.house;
     if (!hf) return "";
     const rows = [];
     if (hf.installment > 0.005) rows.push(`<li><span class="left"><span class="cat-icon">${icon("landmark")}</span><span>${t("budget.home.installment")}</span></span><strong class="num">${eur(hf.installment)}</strong></li>`);
@@ -165,6 +147,7 @@ export function render(root) {
       <div class="card-head">${icon("landmark")}<h2 id="salary-h">${t("budget.salary.title")}</h2></div>
       <p class="stat-label">${t("budget.salary.current", { month: monthName })}</p>
       <p class="stat-value">${eur(sum.salary)}</p>
+      ${sum.salaryFrom ? `<div class="note" style="margin:var(--space-2) 0">${icon("info", { size: 18 })}<p>${sum.salaryFrom.kind === "event" ? t("budget.salary.fromEvent", { name: esc(sum.salaryFrom.name) }) : t("budget.salary.fromStep")} <a href="#/house">${t("budget.salary.openHouse")}</a></p></div>` : ""}
       <p class="stat-sub">${t("budget.salary.note")}</p>
       <p style="margin-top:var(--space-3)"><button type="button" class="btn" data-action="salary-open" aria-expanded="${salaryFormOpen}" ${salaryFormOpen ? 'aria-controls="salary-form"' : ""}>${t("budget.salary.change", { month: monthName })}</button></p>
       ${form}
@@ -175,10 +158,11 @@ export function render(root) {
 
   function diffHtml(catId) {
     const st = state();
-    if (rentReplaced(catId)) return `<span class="diff none">${t("budget.expenses.rentReplaced")}</span>`;
+    const rep = replacement(catId);
+    if (rep) return `<span class="diff none">${replacedText(rep)}</span>`;
     const a = actualFor(st.months, catId, selected);
     if (a === null) return `<span class="diff none">${t("budget.expenses.notLogged")}</span>`;
-    const d = a - plannedFor(st.months, catId, selected).amount;
+    const d = a - plannedDetail(plan.inp, catId, selected).amount;
     if (Math.abs(d) < 0.005) return `<span class="diff none">${t("budget.expenses.onPlan")}</span>`;
     return d > 0
       ? `<span class="diff over">+${eur(d)} ${t("budget.expenses.over")}</span>`
@@ -186,21 +170,28 @@ export function render(root) {
   }
 
   function plannedAttrs(cat) {
-    const p = plannedFor(state().months, cat.id, selected);
-    const inherited = p.from !== null && p.from !== selected;
+    const d = plannedDetail(plan.inp, cat.id, selected);
     const base = t("budget.expenses.plannedFor", { name: catName(cat) });
+    // A life event always wins, and so does a cost step that starts this very month: those amounts are changed in the House Planner.
+    const locked = d.source === "event" || (d.source === "step" && d.stepFrom === selected);
+    let note = "", inherited = false;
+    if (d.source === "event") note = t("budget.expenses.fromEvent", { name: d.event });
+    else if (d.source === "step") { note = t("budget.expenses.fromStep", { month: formatMonth(d.stepFrom) }); inherited = d.stepFrom !== selected; }
+    else inherited = d.budgetFrom !== null && d.budgetFrom !== selected;
+    const carried = d.source === "budget" && inherited ? ` (${t("budget.expenses.carried", { month: formatMonth(d.budgetFrom) })})` : "";
     return {
-      value: p.from === null ? "" : p.amount,
-      inherited,
-      label: inherited ? `${base} (${t("budget.expenses.carried", { month: formatMonth(p.from) })})` : base,
+      value: d.source === "budget" && d.budgetFrom === null ? "" : d.amount,
+      inherited, locked, note,
+      label: `${base}${carried}${note ? ` (${note})` : ""}`,
     };
   }
 
   function expensesHtml() {
     const st = state();
     const rows = st.categories.map((c) => {
-      if (rentReplaced(c.id)) { // rent is €0 once the loan is being paid
-        const label = `${catName(c)}: ${t("budget.expenses.rentReplaced")}`;
+      const rep = replacement(c.id);
+      if (rep) { // €0: rent once the loan is being paid, or an expense a reached goal replaces (a car replaces transport)
+        const label = `${catName(c)}: ${replacedText(rep)}`;
         return `
         <tr>
           <th scope="row"><span class="cat"><span class="cat-icon">${icon(c.icon)}</span>${esc(catName(c))}</span></th>
@@ -213,8 +204,8 @@ export function render(root) {
       const a = actualFor(st.months, c.id, selected);
       return `
         <tr>
-          <th scope="row"><span class="cat"><span class="cat-icon">${icon(c.icon)}</span>${esc(catName(c))}</span></th>
-          <td class="num" data-label="${t("budget.expenses.planned")}">${moneyInput({ id: `planned-${c.id}`, value: p.value, ariaLabel: p.label, className: p.inherited ? "js-planned inherited" : "js-planned", dataAttrs: `data-cat="${c.id}"` })}</td>
+          <th scope="row"><span class="cat"><span class="cat-icon">${icon(c.icon)}</span>${esc(catName(c))}</span>${p.note ? `<span class="cat-note">${esc(p.note)}</span>` : ""}</th>
+          <td class="num" data-label="${t("budget.expenses.planned")}">${moneyInput({ id: `planned-${c.id}`, value: p.value, ariaLabel: p.label, className: p.locked ? "" : p.inherited ? "js-planned inherited" : "js-planned", dataAttrs: `data-cat="${c.id}" ${p.locked ? "disabled" : ""}` })}</td>
           <td class="num" data-label="${t("budget.expenses.actual")}">${moneyInput({ id: `actual-${c.id}`, value: a, ariaLabel: t("budget.expenses.actualFor", { name: catName(c) }), className: "js-actual", dataAttrs: `data-cat="${c.id}"` })}</td>
           <td class="num" data-label="${t("budget.expenses.difference")}" id="diff-${c.id}">${diffHtml(c.id)}</td>
         </tr>`;
@@ -223,7 +214,12 @@ export function render(root) {
       <h2 id="exp-h">${t("budget.expenses.title")}</h2>
       <p class="muted">${t("budget.expenses.intro")}</p>
       <p class="small muted">${t("budget.expenses.carriedHint")}</p>
-      ${houseFor(selected) ? `<div class="note" style="margin-bottom:var(--space-3)">${icon("info", { size: 18 })}<p>${t("budget.expenses.rentZero", { month: formatMonth(houseFor(selected).purchase) })}</p></div>` : ""}
+      ${Object.entries(pic.replacedBy).map(([id, rep]) => {
+        const c = st.categories.find((x) => x.id === id);
+        if (!c) return "";
+        const text = rep.kind === "home" ? t("budget.expenses.rentZero", { month: formatMonth(pic.house.purchase) }) : t("budget.expenses.goalZero", { cat: esc(catName(c)), goal: esc(rep.name) });
+        return `<div class="note" style="margin-bottom:var(--space-3)">${icon("info", { size: 18 })}<p>${text}</p></div>`;
+      }).join("")}
       <div class="table-wrap">
         <table class="expenses">
           <caption class="visually-hidden">${t("budget.expenses.title")} · ${formatMonth(selected)}</caption>
@@ -252,7 +248,7 @@ export function render(root) {
     const rows = Object.keys(BONUS_MONTHS).map(Number).sort((a, b) => a - b).map((m) => {
       const key = monthKey(year, m);
       if (key < st.settings.startMonth || key > endMonth(st)) return "";
-      const b = bonusFor(st.salary, key);
+      const b = bonusForSalary(salaryOn(key), key);
       const sp = splitBonus(b.amount, pct);
       return `<tr class="${key === selected ? "current" : ""}">
         <td>${t("budget.bonus.row", { name: t("budget.bonus." + b.id), month: formatMonthShort(key) })}</td>
@@ -347,8 +343,8 @@ export function render(root) {
       wrap.innerHTML = setupHtml();
     } else {
       selected = clampMonth(st, selected && isMonthKey(selected) ? selected : currentMonth());
-      computeHouse();
-      drawnOwns = Boolean(houseFor(selected));
+      computePlan();
+      drawnKey = replacedKey();
       wrap.innerHTML = mainHtml();
       refresh();
     }
@@ -361,8 +357,8 @@ export function render(root) {
   /** Updates the numbers that change while typing, without redrawing (so focus is kept). */
   function refresh() {
     const st = state();
-    computeHouse(); // what you plan to spend decides when you can buy, which can change what this month looks like
-    if (Boolean(houseFor(selected)) !== drawnOwns) {
+    computePlan(); // what you plan to spend decides when you can buy, which can change what this month looks like
+    if (replacedKey() !== drawnKey) {
       const id = document.activeElement && wrap.contains(document.activeElement) ? document.activeElement.id : "";
       draw(id ? `#${id}` : undefined);
       return;
@@ -377,7 +373,7 @@ export function render(root) {
       const cell = $(`#diff-${c.id}`);
       if (cell) cell.innerHTML = diffHtml(c.id);
       const a = actualFor(st.months, c.id, selected);
-      if (a !== null && !rentReplaced(c.id)) diff += a - plannedFor(st.months, c.id, selected).amount;
+      if (a !== null && !replacement(c.id)) diff += a - plannedDetail(plan.inp, c.id, selected).amount;
     }
     $("#total-planned").textContent = eur(sum.planned);
     $("#total-actual").textContent = sum.loggedCount ? eur(sum.actual) : "–";
@@ -429,6 +425,10 @@ export function render(root) {
         // Expected cost changes in the House Planner that point at this category go too.
         s.house.costSteps = s.house.costSteps.filter((x) => x.catId !== cat.id);
         for (const e of s.house.events) delete e.costs[cat.id];
+        for (const g of s.goals) { // a goal that replaced this expense no longer does
+          if (g.data && g.data.replaces === cat.id) g.data.replaces = null;
+          if (g.draft && g.draft.replaces === cat.id) g.draft.replaces = null;
+        }
       });
       draw("#cat-name");
     }

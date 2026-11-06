@@ -156,6 +156,14 @@ export function render(root) {
           </div>
           <div class="stack">
             <div class="field">${moneyInput({ id: id("ongoing"), label: t("goals.f.ongoing"), value: f.ongoing || "", placeholder: "0", dataAttrs: `${da("ongoing")} aria-describedby="${id("ongoing")}-h"` })}<span class="hint" id="${id("ongoing")}-h">${t("goals.f.ongoingHint")}</span></div>
+            <div class="field">
+              <label for="${id("replaces")}">${t("goals.f.replaces")}</label>
+              <select id="${id("replaces")}" ${da("replaces")} aria-describedby="${id("replaces")}-h">
+                <option value="">${t("goals.f.replacesNone")}</option>
+                ${c.s.categories.map((x) => `<option value="${x.id}" ${f.replaces === x.id ? "selected" : ""}>${esc(x.builtin ? t("cat." + x.id) : x.name)}</option>`).join("")}
+              </select>
+              <span class="hint" id="${id("replaces")}-h">${t("goals.f.replacesHint")}</span>
+            </div>
             <div class="field">${moneyInput({ id: id("paybackAmount"), label: t("goals.f.payback"), value: f.paybackAmount || "", placeholder: "0", dataAttrs: `${da("paybackAmount")} aria-describedby="${id("paybackAmount")}-h"` })}<span class="hint" id="${id("paybackAmount")}-h">${t("goals.f.paybackHint", { when: pbMonth ? formatMonth(pbMonth) : t("goals.f.paybackWhenUnknown") })}</span></div>
             <fieldset class="field">
               <legend>${t("goals.f.paybackTo")}</legend>
@@ -183,6 +191,10 @@ export function render(root) {
       [t("goals.s.amount"), eur(f.amount)],
       [t("goals.s.monthly"), `${eur(plan.monthly)} · ${duration(plan.n)}`],
     ];
+    if (f.replaces) {
+      const cat = c.s.categories.find((x) => x.id === f.replaces);
+      if (cat) facts.push([t("goals.s.replaces"), t("goals.s.replacesText", { cat: esc(cat.builtin ? t("cat." + cat.id) : cat.name), month: formatMonth(plan.reach) })]);
+    }
     if (f.ongoing > 0) facts.push([t("goals.s.ongoing"), t("goals.s.ongoingText", { amount: eur(f.ongoing), month: formatMonth(plan.reach) })]);
     if (f.paybackAmount > 0) facts.push([t("goals.s.payback"), t("goals.s.paybackText", { amount: eur(f.paybackAmount), month: formatMonth(paybackMonth(plan)), to: t("goals.f.to_" + f.paybackTo) })]);
     const pbNote = a.blocked && f.paybackTo === "deposit" ? `<p class="small muted">${t("goals.s.paybackFallback")}</p>` : "";
@@ -272,6 +284,7 @@ export function render(root) {
         const v = parseAmount(raw);
         d[field] = v === null || Number.isNaN(v) ? (OPTIONAL.has(field) ? 0 : null) : v;
       } else if (field === "mode") d.mode = raw === "custom" ? "custom" : "auto";
+      else if (field === "replaces") d.replaces = raw || null;
       else if (field === "paybackTo") d.paybackTo = raw;
     });
   }
@@ -349,6 +362,9 @@ export function render(root) {
     } else if (el.type === "month") {
       setField(id, el.dataset.field, el.value);
       draw(`#${el.id}`);
+    } else if (el.tagName === "SELECT") {
+      setField(id, el.dataset.field, el.value);
+      refreshResult(id);
     }
   });
 

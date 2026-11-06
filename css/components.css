@@ -265,3 +265,5 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 999px; 
 .cut-list { list-style: none; margin: 0 0 var(--space-3); padding: 0; max-width: 28rem; }
 .cut-list li { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--border); }
 .badge-flex { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
+
+.cat-note { display: block; margin-left: 3rem; font-size: var(--text-sm); font-weight: 400; color: var(--text-muted); }

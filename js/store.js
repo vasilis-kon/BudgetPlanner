@@ -115,6 +115,7 @@ export function goalFields(f) {
     ongoing: amountOrNull(f.ongoing) ?? 0,
     paybackAmount: amountOrNull(f.paybackAmount) ?? 0,
     paybackTo: PAYBACK_TARGETS.includes(f.paybackTo) ? f.paybackTo : "deposit",
+    replaces: typeof f.replaces === "string" && /^[\w-]{1,40}$/.test(f.replaces) ? f.replaces : null, // an expense category this goal replaces once reached
   };
 }
 

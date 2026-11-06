@@ -182,6 +182,107 @@ test("budget: an over-budget month tells the user how much to cut", () => {
   is(card.includes("eating out") && card.includes("subscriptions"), "points to flexible categories");
 });
 
+/* ---- the Monthly Budget follows the whole plan (the bug: planner said fine, budget showed a shortfall) ---- */
+const loadBudget = (st) => { localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load(); stage.innerHTML = ""; budget.render(stage); };
+const money = (el) => Number(el.textContent.replace(/[^0-9.\u2212-]/g, "").replace("\u2212", "-"));
+
+test("budget: an expected raise from the House Planner shows in the budget, so the budget and the planner agree", () => {
+  const st = buildSample("basic"); st.house.salarySteps = [{ id: "s1", from: plus(10), amount: 2500 }];
+  loadBudget(st);
+  commit($("#month-input"), plus(0)); // the page remembers the last month viewed
+  eq($("#salary-card .stat-value").textContent, "€2,000", "before the raise");
+  commit($("#month-input"), plus(12));
+  eq($("#salary-card .stat-value").textContent, "€2,500", "after the raise");
+  is($("#salary-card").textContent.includes("raise you expected in the House Planner"), "says where the salary comes from");
+  eq($("#free-card .stat-value").textContent, "€1,200", "2500 - 1300");
+});
+test("budget: the exact situation from the bug report no longer contradicts the planner", () => {
+  const st = buildSample("basic"); st.house.amount = 300000; st.house.salarySteps = [{ id: "s1", from: plus(24), amount: 3200 }];
+  const r = project(inputFromState(buildSample("basic") && (localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)), store.load(), store.getState()), plus(0)));
+  eq(r.feasible, true, "the planner says every month is covered");
+  budget.render((stage.innerHTML = "", stage));
+  for (const k of [plus(30), plus(60), plus(120), plus(200)]) {
+    commit($("#month-input"), k);
+    is(!$("#free-card").textContent.includes("over budget"), "no shortfall shown in " + k + ": " + $("#free-card .stat-value").textContent);
+  }
+});
+test("budget: a cost step shows in later months; one that starts this month is locked and says why", () => {
+  const st = buildSample("basic"); st.house.costSteps = [{ id: "c1", from: plus(10), catId: "groceries", amount: 450 }];
+  loadBudget(st);
+  commit($("#month-input"), plus(5));
+  eq($("#planned-groceries").value, "300"); is(!$("#planned-groceries").disabled, "editable before the step");
+  commit($("#month-input"), plus(10));
+  eq($("#planned-groceries").value, "450"); is($("#planned-groceries").disabled, "locked in the month the step starts");
+  is($("#expenses-card").textContent.includes("cost step"), "the cell explains where 450 comes from");
+  commit($("#month-input"), plus(12));
+  eq($("#planned-groceries").value, "450", "carried on"); is(!$("#planned-groceries").disabled, "a later month can be edited (it then overrides the step)");
+  eq($("#free-card .stat-value").textContent, "€550", "2000 - (1300 + 150)");
+});
+test("budget: a life event's costs are shown and locked while it lasts, then normal again", () => {
+  const st = buildSample("basic");
+  st.house.events = [{ id: "e1", name: "Family starts", start: plus(20), end: plus(24), salary: null, costs: { groceries: 500 } }];
+  loadBudget(st);
+  commit($("#month-input"), plus(21));
+  eq($("#planned-groceries").value, "500"); is($("#planned-groceries").disabled, "locked during the event");
+  is($("#expenses-card").textContent.includes("Family starts"), "names the event");
+  commit($("#month-input"), plus(25));
+  eq($("#planned-groceries").value, "300"); is(!$("#planned-groceries").disabled, "back to normal after the event");
+});
+test("budget: a car replaces transport once it is bought; before that transport is still paid", () => {
+  const st = buildSample("basic");
+  st.goals = [{ id: "car", approved: true, draft: null, data: { name: "Dream Car", start: plus(1), target: plus(13), amount: 2400, mode: "auto", monthly: null, ongoing: 90, paybackAmount: 0, paybackTo: "deposit", replaces: "transport" } }];
+  loadBudget(st);
+  commit($("#month-input"), plus(6));
+  eq($("#planned-transport").value, "80"); is(!$("#planned-transport").disabled, "transport still paid while saving for the car");
+  commit($("#month-input"), plus(13));
+  eq($("#planned-transport").value, "0", "transport is 0 from the month the car is bought"); is($("#planned-transport").disabled, "locked");
+  is($("#expenses-card").textContent.includes("Dream Car") && $("#expenses-card").textContent.includes("replaces it"), "explains it");
+  is($("#goals-card").textContent.includes("€90"), "the car's running costs are paid instead");
+  eq($("#free-card .stat-value").textContent, "€690", "2000 - (1300 - 80 transport) - 90 running costs");
+});
+test("budget: a custom category replaced by a goal is cleaned up when the category is removed", () => {
+  const st = buildSample("basic");
+  st.categories.push({ id: "cx9", name: "Taxi", icon: "car", builtin: false });
+  st.goals = [{ id: "car", approved: true, draft: null, data: { name: "Car", start: plus(1), target: plus(13), amount: 2400, mode: "auto", monthly: null, ongoing: 0, paybackAmount: 0, paybackTo: "deposit", replaces: "cx9" } }];
+  loadBudget(st);
+  $('[data-action="remove-cat"][data-id="cx9"]').click();
+  eq(store.getState().goals[0].data.replaces, null);
+});
+test("budget: the free money on screen matches the House Planner in every month of a full plan", () => {
+  const st = buildSample("full");
+  loadBudget(st);
+  const inp = inputFromState(store.getState(), plus(0));
+  const r = project(inp);
+  is(r.rows.length > 120, "a long plan");
+  let checked = 0;
+  for (let i = 0; i < r.rows.length; i += 4) {
+    const row = r.rows[i];
+    if (row.key > addMonths(buildSample("full").settings.startMonth, 359)) break; // the month picker's range
+    commit($("#month-input"), row.key);
+    const shown = money($("#free-card .stat-value"));
+    if (Math.abs(shown - row.leftover) > 0.011) throw new Error(`${row.key}: budget page shows ${shown}, planner has ${row.leftover.toFixed(2)}`);
+    checked++;
+  }
+  is(checked > 60, "checked many months: " + checked);
+});
+
+/* ---------- Goals: the "replaces" choice ---------- */
+test("goals: a goal can replace an expense, and the choice is saved and shown", () => {
+  start("basic", goals);
+  $('[data-action="add"]').click();
+  const id = store.getState().goals[0].id;
+  type($(`#g-${id}-name`), "Dream Car");
+  commit($(`#g-${id}-start`), plus(2)); commit($(`#g-${id}-target`), plus(14)); type($(`#g-${id}-amount`), "2400"); type($(`#g-${id}-ongoing`), "90");
+  const select = $(`#g-${id}-replaces`);
+  is(!!select && select.querySelector('option[value="transport"]'), "the form offers the categories");
+  is(select.closest(".field").textContent.includes("For a car, choose Transport"), "the hint explains the car case");
+  commit(select, "transport");
+  eq(store.getState().goals[0].draft.replaces, "transport", "saved in the draft");
+  $(`[data-action="approve"][data-id="${id}"]`).click();
+  eq(store.getState().goals[0].data.replaces, "transport");
+  is($("article").textContent.includes("Replaces") && $("article").textContent.includes("Transport counts as €0"), "the approved goal says what it replaces");
+});
+
 /* ---------- House Planner ---------- */
 test("house: add a salary step and a cost step", () => {
   start("basic", house);

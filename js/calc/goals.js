@@ -63,10 +63,24 @@ export function goalLinesFor(goals, key) {
   return { lines, total };
 }
 
+/**
+ * Expenses that approved goals replace once they are reached, as a Map of category id to the goal's name.
+ * A car, for example, replaces transport: its running costs take over, so the transport budget counts as zero.
+ */
+export function replacedCategories(goals, key) {
+  const out = new Map();
+  for (const g of goals) {
+    if (!g.replaces) continue;
+    const plan = goalPlan(g);
+    if (plan.valid && key >= plan.reach && !out.has(g.replaces)) out.set(g.replaces, g.name);
+  }
+  return out;
+}
+
 /** Free money per month from the Monthly Budget alone, minus every approved goal except `excludeId`. */
 export function budgetFreeFn(budget, goals, excludeId) {
   const others = goals.filter((g) => g.id !== excludeId);
-  return (key) => summarizeMonth(budget, key).free - goalLinesFor(others, key).total;
+  return (key) => summarizeMonth({ ...budget, skipCategories: [...replacedCategories(others, key).keys()] }, key).free - goalLinesFor(others, key).total;
 }
 
 /**
