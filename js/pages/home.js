@@ -3,6 +3,7 @@
 import { t, formatMoney as eur, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
 import { esc } from "../components/dom.js";
+import { overspendHtml } from "../components/overspend.js";
 import { currentMonth, duration } from "../components/format.js";
 import * as store from "../store.js";
 import { monthsBetween, addMonths } from "../calc/budget.js";
@@ -83,7 +84,8 @@ export function render(root) {
   }
 
   const inp = inputFromState(s, today);
-  const r = project(inp, prepare(inp));
+  const prep = prepare(inp);
+  const r = project(inp, prep);
   const items = buildRoadmap({ today, goals: inp.goals, events: s.house.events, result: r });
   const at = hereIndex(items, today);
   const here = `
@@ -94,7 +96,7 @@ export function render(root) {
   const list = [...items.slice(0, at).map((it) => milestone(it, today)), here, ...items.slice(at).map((it) => milestone(it, today))].join("");
 
   let summary = "";
-  if (r.fin.ok && r.depositReady && r.debtFree) {
+  if (r.fin.ok && r.feasible && r.depositReady && r.debtFree) {
     summary = `<dl class="stat-grid">
       <div class="stat"><dt>${t("home.sDeposit")}</dt><dd>${formatMonth(r.depositReady)}</dd></div>
       <div class="stat"><dt>${t("home.sBuy")}</dt><dd>${formatMonth(r.purchase)}</dd></div>
@@ -103,12 +105,13 @@ export function render(root) {
   }
   const hints = [];
   if (!r.fin.ok) hints.push(`<div class="note">${icon("info", { size: 18 })}<p>${t("home.hintHouse")} <a href="#/house">${t("home.hintHouseLink")}</a></p></div>`);
-  else if (!r.depositReady) hints.push(`<div class="note note-warn">${icon("triangle-alert", { size: 18 })}<p>${t("home.hintNoDeposit")} <a href="#/house">${t("home.hintHouseLink")}</a></p></div>`);
+  else if (!r.depositReady && !r.problems.length) hints.push(`<div class="note note-warn">${icon("triangle-alert", { size: 18 })}<p>${t("home.hintNoDeposit")} <a href="#/house">${t("home.hintHouseLink")}</a></p></div>`);
   if (!inp.goals.length) hints.push(`<div class="note">${icon("info", { size: 18 })}<p>${t("home.hintGoals")} <a href="#/goals">${t("home.hintGoalsLink")}</a></p></div>`);
 
   root.innerHTML = `
     <div class="page-head"><h1>${t("home.title")}</h1><p>${t("home.intro")}</p></div>
     <div class="stack-lg">
+      ${overspendHtml({ inp, prep, r, categories: s.categories })}
       <section class="card" aria-labelledby="road-h">
         <div class="card-head">${icon("map-pinned")}<h2 id="road-h">${t("home.roadmapTitle")}</h2></div>
         ${summary}

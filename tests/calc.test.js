@@ -3,7 +3,7 @@
 import { addMonths, monthsBetween, summarizeMonth } from "../js/calc/budget.js";
 import { pmt, createLoan, loanSummary, affordability, loanForPayment } from "../js/calc/loan.js";
 import { goalPlan, goalContribution, goalLinesFor, checkGoal, approvedGoals } from "../js/calc/goals.js";
-import { prepare, project, houseFinance, inputFromState, supportSweep, loanMonths, todayFactor } from "../js/calc/projection.js";
+import { prepare, project, houseFinance, inputFromState, supportSweep, loanMonths, todayFactor, newShortfalls, cutAdvice, isFlexible } from "../js/calc/projection.js";
 import { emptyState, sanitize, defaultHouse, goalFields } from "../js/store.js";
 
 const results = [];
@@ -424,6 +424,82 @@ test("in today's euros the retirement-year net worth is smaller than in future e
   const r = run(withAge(30));
   const last = r.years[r.years.length - 1];
   is(last.real.netWorth < last.nom.netWorth, "deflated value must be smaller");
+});
+
+/* ---------- rent becomes zero once the loan is being paid ---------- */
+test("budget: with the house, rent counts as zero and the installment and home costs take its place", () => {
+  const b = { salarySteps: [{ from: TODAY, amount: 2000 }], categoryIds: ["rent", "groceries"], months: { [TODAY]: { planned: { rent: 600, groceries: 300 }, actual: {} } }, bonusSharePct: 50 };
+  near(summarizeMonth(b, TODAY).free, 1100, 1e-9);
+  const s = summarizeMonth({ ...b, skipCategories: ["rent"], houseTotal: 860 }, TODAY);
+  near(s.spent, 300, 1e-9, "rent is not in expenses"); near(s.planned, 300, 1e-9); eq(s.houseTotal, 860);
+  near(s.free, 2000 - 300 - 860, 1e-9);
+});
+test("the Monthly Budget and the House Planner agree on free money once the loan has started", () => {
+  const st = baseState(); const r = run(st);
+  const key = addMonths(r.purchase, 3);
+  const row = r.rows.find((x) => x.key === key);
+  const free = summarizeMonth({ salarySteps: st.salary, categoryIds: st.categories.map((c) => c.id), months: st.months, bonusSharePct: 50, houseTotal: row.installment + st.house.loan.homeCosts, skipCategories: ["rent"] }, key).free;
+  near(free, row.leftover, 0.01, "budget page vs planner");
+});
+
+/* ---------- overspending is not allowed ---------- */
+const shortState = () => { const st = baseState(); st.house.amount = 350000; return st; }; // installment about 1,730, plus 420 of costs, on a 2,000 salary
+test("a plan whose installment is more than the salary allows is flagged, with the short months listed", () => {
+  const r = run(shortState());
+  eq(r.feasible, false);
+  const p = r.problems.find((x) => x.kind === "installment");
+  is(!!p && p.worst > 100, "installment shortfall found");
+  is(Object.keys(r.shortByMonth).length === p.months, "one entry per short month");
+  is(Object.keys(r.shortByMonth).every((k) => k >= TODAY), "only months from today on");
+});
+test("a plan that covers every month is feasible and has no short months", () => {
+  const r = run(baseState());
+  eq(r.feasible, true); eq(Object.keys(r.shortByMonth).length, 0);
+});
+test("expenses above salary are flagged even before a house price is entered", () => {
+  const st = baseState(); st.house.amount = null; st.months[TODAY].planned.rent = 1800; // 2,100 of spending on 2,000
+  const r = run(st);
+  eq(r.feasible, false); eq(r.problems[0].kind, "expenses"); near(r.problems[0].worst, 100, 0.01, "short by");
+});
+test("months that are already past are not flagged (they cannot be changed)", () => {
+  const st = baseState(); st.settings.startMonth = "2026-01"; st.salary = [{ from: "2026-01", amount: 2000 }];
+  st.months = { "2026-03": { planned: { rent: 3000 }, actual: {} }, "2026-11": { planned: { rent: 600, groceries: 300 }, actual: {} } };
+  st.house.amount = null;
+  eq(run(st).feasible, true);
+});
+test("newShortfalls reports only months a change adds or makes worse", () => {
+  const before = { "2030-01": 100, "2030-03": 40 };
+  const after = { "2030-01": 100, "2030-02": 50, "2030-03": 60 };
+  const w = newShortfalls(before, after);
+  eq(w.length, 1); eq(w[0].from, "2030-02"); eq(w[0].to, "2030-03"); eq(w[0].months, 2); eq(w[0].worst, 60);
+  eq(newShortfalls(after, before).length, 0, "an improvement adds nothing");
+});
+test("cut advice: biggest categories first, flexible ones marked, rent left out once the house is owned", () => {
+  const st = shortState(); const inp = inputFromState(st, TODAY); const prep = prepare(inp); const r = project(inp, prep);
+  const a = cutAdvice(inp, prep, r, r.problems.find((x) => x.kind === "installment"));
+  eq(a.owns, true); is(!a.categories.some((c) => c.id === "rent"), "rent is replaced by home costs");
+  for (let i = 1; i < a.categories.length; i++) is(a.categories[i - 1].amount >= a.categories[i].amount, "sorted");
+  eq(a.enough, false, "300 of groceries is essential, so cutting flexible spending cannot fix this");
+  near(a.needed, r.problems[0].worst, 1e-9);
+});
+test("cut advice before the purchase lists rent and counts only flexible spending as easy to cut", () => {
+  const st = baseState(); st.house.amount = null;
+  st.months[TODAY].planned = { rent: 1700, groceries: 300, eating: 150, leisure: 100 }; // 2,250 on 2,000
+  const inp = inputFromState(st, TODAY); const prep = prepare(inp); const r = project(inp, prep);
+  const a = cutAdvice(inp, prep, r, r.problems[0]);
+  is(a.categories.some((c) => c.id === "rent"), "rent is listed before the purchase");
+  eq(a.flexibleTotal, 250); eq(a.enough, true, "250 of flexible spending covers a 250 gap");
+  is(isFlexible("eating") && isFlexible("my-custom-category") && !isFlexible("rent") && !isFlexible("groceries"), "flexible means everything except the essentials");
+});
+test("roadmap leaves out the dates that rest on overspending", () => {
+  const st = shortState(); const inp = inputFromState(st, TODAY); const r = project(inp);
+  const kinds = buildRoadmap({ today: TODAY, goals: [], events: [], result: r }).map((i) => i.kind);
+  is(kinds.includes("deposit") && kinds.includes("purchase"), "the deposit date is still valid");
+  is(!kinds.includes("debtFree") && !kinds.includes("loanEnd"), "debt-free and loan end are hidden");
+  const st2 = baseState(); st2.months[TODAY].planned.rent = 2200; // overspends before buying
+  const inp2 = inputFromState(st2, TODAY);
+  const kinds2 = buildRoadmap({ today: TODAY, goals: [], events: [], result: project(inp2) }).map((i) => i.kind);
+  is(!kinds2.includes("deposit") && !kinds2.includes("debtFree"), "nothing after the plan starts to overspend is shown");
 });
 
 /* ---------- saved data ---------- */

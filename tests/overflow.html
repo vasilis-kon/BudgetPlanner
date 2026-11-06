@@ -12,7 +12,7 @@
   const f = document.getElementById("f");
   const lines = [];
   for (const route of routes) {
-    localStorage.setItem("budgetplanner:v1", JSON.stringify(buildSample("full", { theme: "light" })));
+    localStorage.setItem("budgetplanner:v1", JSON.stringify(buildSample(q.get("variant") || "full", { theme: "light" })));
     await new Promise((r) => { f.onload = r; f.src = `../index.html#/${route}`; });
     await new Promise((r) => setTimeout(r, 1200));
     const d = f.contentDocument, W = d.documentElement.clientWidth;

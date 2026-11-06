@@ -41,7 +41,7 @@ function check(name, variant, expectations) {
   }
 }
 
-for (const variant of ["empty", "basic", "full"]) {
+for (const variant of ["empty", "basic", "full", "short"]) {
   for (const name of Object.keys(PAGES)) {
     const expect = {};
     if (name === "home" && variant === "full") {
@@ -51,6 +51,22 @@ for (const variant of ["empty", "basic", "full"]) {
       expect["roadmap shows the life event"] = (o) => o.text.includes("Family starts");
       expect["roadmap shows the loan being fully repaid after debt-free"] = (o) => o.text.indexOf("Debt-free") < o.text.indexOf("Loan fully repaid") && o.text.includes("Nothing is sold");
       expect["roadmap has progress bars"] = (o) => o.root.querySelectorAll("progress").length >= 2;
+    }
+    if (variant === "short" && name === "house") {
+      expect["house shows the red box"] = (o) => !!o.root.querySelector(".card-danger") && o.text.includes("Your plan overspends");
+      expect["house says how much to cut"] = (o) => /Cut at least €\d/.test(o.text);
+      expect["no debt-free date"] = (o) => !o.text.includes("You are debt-free in");
+      expect["no charts"] = (o) => !o.root.querySelector("canvas");
+    }
+    if (variant === "short" && name === "overview") {
+      expect["overview shows the red box instead of the plan"] = (o) => o.text.includes("Your plan overspends") && !o.root.querySelector(".data-table");
+    }
+    if (variant === "short" && name === "home") {
+      expect["home shows the red box"] = (o) => o.text.includes("Your plan overspends");
+      expect["home hides debt-free and loan end"] = (o) => !o.text.includes("Loan fully repaid") && !o.text.includes("Open Overview");
+    }
+    if ((variant === "full" || variant === "basic") && ["house", "overview", "home"].includes(name)) {
+      expect["a plan that covers its costs shows no red box"] = (o) => !o.root.querySelector(".card-danger");
     }
     if (name === "home" && variant === "empty") expect["who this is for note shows"] = (o) => o.text.includes("Who this is for");
     if (name === "goals" && variant === "full") {

@@ -1,5 +1,6 @@
 // Sample saved data for tests and for tests/seed.html. Months are relative to today so the plan always
-// starts "now". Variants: "empty" (budget only), "basic" (plus a house price), "full" (goals, steps, events, support).
+// starts "now". Variants: "empty" (budget only), "basic" (plus a house price), "full" (goals, steps, events, support),
+// "short" (a house too dear for the salary: the plan overspends once the installment starts).
 export function buildSample(variant = "full", { theme = "system", now = new Date() } = {}) {
   const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const plus = (n) => key(new Date(now.getFullYear(), now.getMonth() + n, 1));
@@ -19,7 +20,7 @@ export function buildSample(variant = "full", { theme = "system", now = new Date
     goals: [],
     house: {},
   };
-  if (variant !== "empty") state.house = { mode: "price", amount: 150000, ltvPct: 80, costsPct: 7, buffer: 5000 };
+  if (variant !== "empty") state.house = { mode: "price", amount: variant === "short" ? 300000 : 150000, ltvPct: 80, costsPct: 7, buffer: 5000 };
   if (variant === "full") {
     state.goals = [
       { id: "car", approved: true, draft: null, data: { name: "Dream Car", start: plus(3), target: plus(15), amount: 3600, mode: "auto", monthly: null, ongoing: 90, paybackAmount: 0, paybackTo: "deposit" } },
@@ -29,7 +30,7 @@ export function buildSample(variant = "full", { theme = "system", now = new Date
     state.house.salarySteps = [{ id: "s1", from: plus(30), amount: 2300 }];
     state.house.costSteps = [{ id: "c1", from: plus(40), catId: "utilities", amount: 140 }];
     state.house.events = [{ id: "e1", name: "Family starts", start: plus(60), end: null, salary: null, costs: { groceries: 450 } },
-      { id: "e2", name: "Unemployed", start: plus(90), end: plus(94), salary: 0, costs: { eating: 20, leisure: 30 } }];
+      { id: "e2", name: "Reduced hours", start: plus(90), end: plus(94), salary: 2000, costs: { eating: 20, leisure: 30 } }];
     state.house.support = { on: true, type: "room", rent: 350, emptyMonths: 1, taxPct: 15, years: 15 };
     state.house.age = 30; // the charts then run until 65
   }

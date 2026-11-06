@@ -9,7 +9,7 @@ import { currentMonth, duration } from "../components/format.js";
 import * as store from "../store.js";
 import { addMonths, isMonthKey, monthsBetween } from "../calc/budget.js";
 import { checkGoal, budgetFreeFn, approvedGoals, goalContribution, goalLinesFor, paybackMonth } from "../calc/goals.js";
-import { inputFromState, prepare, project } from "../calc/projection.js";
+import { inputFromState, prepare, project, newShortfalls } from "../calc/projection.js";
 
 const NUMERIC = new Set(["amount", "monthly", "ongoing", "paybackAmount"]);
 const OPTIONAL = new Set(["ongoing", "paybackAmount"]); // empty means 0
@@ -40,7 +40,7 @@ export function render(root) {
     const d = { id: g.id, ...f };
     const free = budgetFreeFn(c.budget, c.approved, g.id);
     const check = checkGoal(d, free);
-    const out = { d, check, houseSet: false, delay: null, blocked: false, minLeft: null };
+    const out = { d, check, houseSet: false, delay: null, blocked: false, minLeft: null, overspend: [] };
     if (!check.valid) return out;
     let minLeft = Infinity;
     for (let i = 0; i < check.plan.n; i++) {
@@ -52,6 +52,8 @@ export function render(root) {
     const without = project({ ...c.inp, goals: others }, c.prep);
     const withIt = project({ ...c.inp, goals: [...others, d] }, c.prep);
     out.houseSet = without.fin.ok;
+    // Overspending this goal would add later on (for example once the installment starts), which the plan does not allow.
+    out.overspend = newShortfalls(without.shortByMonth, withIt.shortByMonth);
     if (without.fin.ok) {
       out.delay = without.depositReady && withIt.depositReady ? monthsBetween(without.depositReady, withIt.depositReady) : undefined;
       if (f.paybackAmount > 0 && withIt.purchase && paybackMonth(check.plan) >= withIt.purchase) out.blocked = true;
@@ -101,10 +103,13 @@ export function render(root) {
           <p class="small">${t(sugg.length ? "goals.check.suggest" : "goals.check.noSuggest")}</p>
           ${sugg.length ? `<div class="row">${sugg.join("")}</div>` : ""}`;
       }
-      body = `<p class="stat-sub" style="margin-top:0"><strong>${head}</strong></p>${verdict}${delayText(f.name, a)}`;
+      const over = a.overspend.length
+        ? (() => { const p = a.overspend.reduce((m, x) => (x.worst > m.worst ? x : m), a.overspend[0]); return `<div class="note note-danger">${icon("triangle-alert", { size: 18 })}<p><strong>${t("goals.check.overspendTitle")}</strong> ${t("goals.check.overspend", { by: eur(Math.ceil(p.worst)), range: p.from === p.to ? formatMonth(p.from) : t("house.range", { from: formatMonth(p.from), to: formatMonth(p.to) }) })}</p></div>`; })()
+        : "";
+      body = `<p class="stat-sub" style="margin-top:0"><strong>${head}</strong></p>${verdict}${over}${delayText(f.name, a)}`;
     }
     const nameOk = f.name.trim() !== "";
-    const canApprove = a.check.valid && a.check.ok && nameOk && !(f.start && f.start < startMin);
+    const canApprove = a.check.valid && a.check.ok && nameOk && !a.overspend.length && !(f.start && f.start < startMin);
     return `
       <div class="goal-result" id="result-${g.id}" role="status" aria-live="polite">
         ${body}
@@ -297,7 +302,7 @@ export function render(root) {
       const g = goalOf(id);
       const c = context();
       const a = analyse(c, g, g.draft);
-      if (!a.check.valid || !a.check.ok || !g.draft.name.trim()) return;
+      if (!a.check.valid || !a.check.ok || a.overspend.length || !g.draft.name.trim()) return;
       store.update((x) => { const y = x.goals.find((z) => z.id === id); y.data = store.goalFields(y.draft); y.approved = true; y.draft = null; });
       draw(`[data-action="edit"][data-id="${id}"]`);
     } else if (act === "use-later") {

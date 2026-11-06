@@ -5,6 +5,7 @@ import { buildSample } from "./sample.js";
 const AXE = "https://cdn.jsdelivr.net/npm/axe-core@4.10.2/axe.min.js";
 const q = new URLSearchParams(location.search);
 const ROUTES = q.get("route") ? [q.get("route")] : ["home", "budget", "goals", "house", "overview"];
+const VARIANT = q.get("variant") || "full";
 const THEMES = q.get("theme") ? [q.get("theme")] : ["light", "dark"];
 const WIDTHS = q.get("w") ? [Number(q.get("w"))] : [1200, 390];
 const out = document.getElementById("out");
@@ -40,7 +41,7 @@ try {
     for (const w of WIDTHS) {
       for (const route of ROUTES) {
         progress(`Checking ${route} · ${theme} · ${w}px`);
-        localStorage.setItem("budgetplanner:v1", JSON.stringify(buildSample("full", { theme })));
+        localStorage.setItem("budgetplanner:v1", JSON.stringify(buildSample(VARIANT, { theme })));
         await load(route, w);
         // Open the optional panels so their contents are checked too.
         frame.contentDocument.querySelectorAll("details").forEach((d) => (d.open = true));
@@ -48,15 +49,22 @@ try {
         const main = frame.contentDocument.querySelector("main");
         if (!main || !main.querySelector("h1") || main.textContent.length < 300) throw new Error(`${route} did not draw any content`);
         // The House Planner's add forms only exist once their button is pressed, so check each one open too.
-        const states = route === "house" ? [null, "salary", "cost", "event"] : [null];
+        const states = route === "house" ? [null, "salary", "cost", "event"] : route === "budget" ? [null, "after-purchase"] : [null];
         for (const state of states) {
-          if (state) {
+          if (state === "after-purchase") { // a month when rent is replaced by the loan
+            const d = new Date(); const later = new Date(d.getFullYear(), d.getMonth() + 60, 1);
+            const input = frame.contentDocument.querySelector("#month-input");
+            input.value = `${later.getFullYear()}-${String(later.getMonth() + 1).padStart(2, "0")}`;
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+            await wait(300);
+            if (!frame.contentDocument.querySelector("#home-card")) throw new Error("the home card did not appear after the purchase");
+          } else if (state) {
             frame.contentDocument.querySelector(`[data-action="open-form"][data-form="${state}"]`).click();
             await wait(300);
             if (!frame.contentDocument.querySelector("form.inline-form")) throw new Error(`the ${state} form did not open`);
           }
           const res = await axeIn(frame.contentWindow);
-          const label = `${route}${state ? " (" + state + " form open)" : ""} · ${theme} · ${w}px`;
+          const label = `${route}${state === "after-purchase" ? " (a month after the purchase)" : state ? " (" + state + " form open)" : ""} · ${theme} · ${w}px`;
           if (!res.violations.length) lines.push(`<span class="pass">PASS</span> ${label}`);
           for (const v of res.violations) {
             total++;

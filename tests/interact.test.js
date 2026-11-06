@@ -5,6 +5,8 @@ import * as house from "../js/pages/house.js";
 import * as budget from "../js/pages/budget.js";
 import * as overview from "../js/pages/overview.js";
 import { buildSample } from "./sample.js";
+import { addMonths } from "../js/calc/budget.js";
+import { inputFromState, project } from "../js/calc/projection.js";
 
 const results = [];
 const stage = document.getElementById("stage");
@@ -71,6 +73,18 @@ test("goals: a goal that does not fit cannot be approved and offers a way out", 
   is(d.target > plus(5), "target moved later: " + d.target);
   is($(`#result-${id}`).textContent.includes("It fits"), "now fits");
 });
+test("goals: a goal that fits the budget but would overspend once the installment starts cannot be approved", () => {
+  start("basic", goals);
+  $('[data-action="add"]').click();
+  const id = store.getState().goals[0].id;
+  type($(`#g-${id}-name`), "Long project");
+  commit($(`#g-${id}-start`), plus(70)); commit($(`#g-${id}-target`), plus(82)); type($(`#g-${id}-amount`), "7200"); // 600 a month: fits 700 free, not the 440 left after the installment
+  const text = $(`#result-${id}`).textContent;
+  is(text.includes("overspend") && text.includes("short by up to"), "explains the overspending: " + text);
+  is($(`[data-action="approve"][data-id="${id}"]`).disabled, "approve is disabled");
+  type($(`#g-${id}-amount`), "3600"); // 300 a month fits
+  is(!$(`[data-action="approve"][data-id="${id}"]`).disabled, "a smaller goal can be approved");
+});
 test("goals: nothing is approved without a name", () => {
   start("basic", goals);
   $('[data-action="add"]').click();
@@ -126,6 +140,48 @@ test("budget: an approved goal appears as a line and lowers free money", () => {
   eq($("#free-card .stat-value").textContent, freeBefore, "free money back to normal before the goal starts");
 });
 
+test("budget: from the month the loan starts, rent is 0 and the installment and home costs appear instead", () => {
+  const st = buildSample("basic");
+  localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load();
+  const purchase = project(inputFromState(store.getState(), plus(0))).purchase;
+  stage.innerHTML = ""; budget.render(stage);
+  is(!$("#home-card"), "no home card before the house is bought");
+  eq($("#planned-rent").value, "600"); is(!$("#planned-rent").disabled, "rent can be edited");
+  eq($("#free-card .stat-value").textContent, "€700", "free money before: 2000 - 1300");
+  commit($("#month-input"), addMonths(purchase, -1));
+  eq($("#planned-rent").value, "600", "the month before the first installment still has rent");
+  commit($("#month-input"), purchase);
+  is(!!$("#home-card"), "home card appears in the first month of the loan");
+  eq($("#planned-rent").value, "0", "rent is 0");
+  is($("#planned-rent").disabled && $("#actual-rent").disabled, "rent fields are locked");
+  const card = $("#home-card").textContent;
+  is(card.includes("Loan installment") && card.includes("€739.88") && card.includes("€120"), "installment and running costs listed: " + card);
+  is($("#expenses-card").textContent.includes("Rent counts as €0"), "explains why rent is 0");
+  is(/€44\d/.test($("#free-card .stat-value").textContent), "free money is 2000 - 700 - 120 - 740: " + $("#free-card .stat-value").textContent);
+  eq($("#total-planned").textContent, "€700", "the planned total leaves rent out");
+  is($("#free-card").textContent.includes("Home"), "free money shows the home term");
+  commit($("#month-input"), plus(300)); // long after the loan has ended
+  is($("#home-card").textContent.includes("fully repaid") && !$("#home-card").textContent.includes("Loan installment"), "after the loan only the running costs remain");
+  eq($("#free-card .stat-value").textContent, "€1,180", "2000 - 700 - 120");
+  commit($("#month-input"), plus(0));
+  eq($("#planned-rent").value, "600", "back before the purchase, rent is back"); is(!$("#home-card"));
+});
+test("budget: without a house price nothing changes about rent", () => {
+  const st = buildSample("empty");
+  localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load();
+  stage.innerHTML = ""; budget.render(stage);
+  commit($("#month-input"), plus(60));
+  is(!$("#home-card") && !$("#planned-rent").disabled, "rent stays until a house is planned");
+});
+test("budget: an over-budget month tells the user how much to cut", () => {
+  const st = buildSample("basic"); st.months[Object.keys(st.months)[0]].planned.rent = 1900; // 2,600 of spending on 2,000
+  localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load();
+  stage.innerHTML = ""; budget.render(stage);
+  const card = $("#free-card").textContent;
+  is(card.includes("over budget") && /Cut at least €6\d\d a month/.test(card), "says how much to cut: " + card.slice(0, 300));
+  is(card.includes("eating out") && card.includes("subscriptions"), "points to flexible categories");
+});
+
 /* ---------- House Planner ---------- */
 test("house: add a salary step and a cost step", () => {
   start("basic", house);
@@ -151,20 +207,54 @@ test("house: a salary step must be above zero and not before the plan", () => {
   eq(store.getState().house.salarySteps.length, 0, "rejected");
   is($("#ss-error").textContent.length > 0, "error message shown");
 });
-test("house: add an unemployment event and see the installment check flag it", () => {
+test("house: an event that would overspend is refused and tells the user to cut expenses", () => {
   start("basic", house);
   openForm("event");
-  type($("#ev-name"), "Unemployed");
-  commit($("#ev-start"), plus(70));
-  commit($("#ev-end"), plus(74));
-  type($("#ev-salary"), "0");
-  type($("#ev-cost-groceries"), "250");
+  type($("#ev-name"), "Unemployed"); commit($("#ev-start"), plus(70)); commit($("#ev-end"), plus(74));
+  type($("#ev-salary"), "0"); type($("#ev-cost-groceries"), "250");
   submit($("#event-form"));
-  const ev = store.getState().house.events;
-  eq(ev.length, 1); eq(ev[0].salary, 0); eq(ev[0].name, "Unemployed"); eq(ev[0].costs.groceries, 250);
-  is($("#res-future").textContent.includes("cannot be covered"), "check flags the months: " + $("#res-future").textContent);
+  eq(store.getState().house.events.length, 0, "not saved");
+  const err = $("#ev-error").textContent;
+  is(err.includes("cannot overspend") && /short by up to €\d/.test(err), "message with the amount: " + err);
+  is(!!$("#event-form"), "the form stays open so the amounts can be cut");
+});
+test("house: the same kind of event is accepted once expenses are cut enough", () => {
+  start("basic", house);
+  openForm("event");
+  type($("#ev-name"), "Reduced hours"); commit($("#ev-start"), plus(70)); commit($("#ev-end"), plus(74));
+  type($("#ev-salary"), "1500");
+  for (const c of ["eating", "leisure", "subscriptions", "other"]) type($(`#ev-cost-${c}`), "0");
+  submit($("#event-form"));
+  eq(store.getState().house.events.length, 1);
+  is(!$("#res-future").textContent.includes("cannot be covered"), "the installment check is clean");
   $('[data-action="rm-event"]').click();
   eq(store.getState().house.events.length, 0);
+});
+test("house: a cost step or a salary step that would overspend is refused", () => {
+  start("basic", house);
+  openForm("cost"); commit($("#cs-cat"), "groceries"); commit($("#cs-from"), plus(12)); type($("#cs-amount"), "5000");
+  $("#cost-step-form").requestSubmit();
+  eq(store.getState().house.costSteps.length, 0); is($("#cs-error").textContent.includes("cannot overspend"), "cost step refused");
+  openForm("salary"); commit($("#ss-from"), plus(12)); type($("#ss-amount"), "900");
+  $("#salary-step-form").requestSubmit();
+  eq(store.getState().house.salarySteps.length, 0); is($("#ss-error").textContent.includes("cannot overspend"), "a salary below expenses is refused");
+});
+test("house: a plan that already overspends shows the red box with what to cut, and hides the dates", () => {
+  start("short", house);
+  const box = $("#res-overspend");
+  is(box.textContent.includes("Your plan overspends"), "red box shown");
+  is(/Cut at least €\d/.test(box.textContent), "says how much to cut");
+  is(box.textContent.includes("essential") || box.textContent.includes("flexible"), "lists categories");
+  is(!$("#res-c").textContent.includes("You are debt-free in"), "no debt-free date while overspending");
+  is($("#res-c").textContent.includes("overspends"), "says why");
+  is($("#res-b").textContent.includes("cannot afford this installment"), "the installment is called unaffordable");
+  is($("#res-a").textContent.includes("Deposit ready in"), "the deposit date is still valid (only the installment overspends)");
+});
+test("house: fixing the overspending (a smaller house) brings the results back", () => {
+  start("short", house);
+  type($("#f-amount"), "150000");
+  eq($("#res-overspend").textContent.trim(), "", "red box gone");
+  is($("#res-c").textContent.includes("You are debt-free in"), "debt-free date is back");
 });
 test("house: an event needs a name and at least one change", () => {
   start("basic", house);

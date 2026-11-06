@@ -3,6 +3,7 @@ import { t, formatWhole as eur, formatCompact, formatMonth } from "../i18n/index
 import { icon } from "../components/icon.js";
 import { currentMonth, duration } from "../components/format.js";
 import { mountChart, chartFigure, baseOptions } from "../components/chart.js";
+import { overspendHtml } from "../components/overspend.js";
 import * as store from "../store.js";
 import { monthsBetween } from "../calc/budget.js";
 import { inputFromState, prepare, project, loanMonths, RETIREMENT_AGE } from "../calc/projection.js";
@@ -22,7 +23,12 @@ export function render(root) {
     if (!s.settings.startMonth) { wrap.innerHTML = prompt(t("overview.needBudget"), "#/budget", t("overview.needBudgetCta")); return; }
     const today = currentMonth();
     const inp = inputFromState(s, today);
-    const r = project(inp, prepare(inp));
+    const prep = prepare(inp);
+    const r = project(inp, prep);
+    if (r.fin.ok && r.problems.length) { // a plan that overspends is not shown: say what to cut instead
+      wrap.innerHTML = head + overspendHtml({ inp, prep, r, categories: s.categories });
+      return;
+    }
     if (!r.fin.ok || !r.depositReady || !r.debtFree) {
       const text = !r.fin.ok ? t("overview.needHouse") : !r.depositReady ? t("overview.noDeposit") : t("overview.noDebtFree");
       wrap.innerHTML = prompt(text, "#/house", t("overview.needHouseCta"));

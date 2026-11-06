@@ -7,11 +7,12 @@ import { moneyInput } from "../components/money-input.js";
 import { monthField } from "../components/month-picker.js";
 import { currentMonth, duration } from "../components/format.js";
 import { mountChart, chartFigure, baseOptions } from "../components/chart.js";
+import { overspendHtml } from "../components/overspend.js";
 import * as store from "../store.js";
 import { addMonths, isMonthKey, monthsBetween } from "../calc/budget.js";
 import { approvedGoals, goalLinesFor } from "../calc/goals.js";
 import { AFFORD_OK, AFFORD_MAX } from "../calc/loan.js";
-import { inputFromState, prepare, project, loanFigures, supportSweep, todayFactor, loanMonths, RENT_CATEGORY, RETIREMENT_AGE } from "../calc/projection.js";
+import { inputFromState, prepare, project, loanFigures, supportSweep, todayFactor, loanMonths, newShortfalls, RENT_CATEGORY, RETIREMENT_AGE } from "../calc/projection.js";
 
 const get = (obj, path) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
 const set = (obj, path, v) => {
@@ -272,6 +273,7 @@ export function render(root) {
       ${stat(t("house.a.rBuffer"), eur(f.buffer))}
       ${stat(t("house.a.rNeeded"), eur(f.cashNeeded))}
     </dl>`;
+    if (r.problems.some((p) => p.kind === "expenses")) return stats + note("note-danger", "triangle-alert", t("house.a.blocked"));
     if (!r.depositReady) return stats + note("note-warn", "triangle-alert", t("house.a.never", { years: 50 }));
     const wait = monthsBetween(a.today, r.depositReady);
     const when = wait <= 0 ? t("house.a.nowOrPast") : t("house.a.inTime", { time: duration(wait) });
@@ -340,7 +342,9 @@ export function render(root) {
       return [t("house.b.loanYear", { n: y, year: key.slice(0, 4) }), eurc(nominal), eurc(nominal * todayFactor(a.today, key, a.infl))];
     });
     const warnTerm = h.loan.termYears > 20 ? note("note-warn", "triangle-alert", t("house.b.longTerm")) : "";
-    return `${stats}${chip}${sizing}${warnTerm}
+    const unaffordable = r.problems.find((p) => p.kind === "installment");
+    const cantAfford = unaffordable ? note("note-danger", "triangle-alert", t("house.b.unaffordable", { month: formatMonth(unaffordable.from) })) : "";
+    return `${stats}${cantAfford}${chip}${sizing}${warnTerm}
       <h3 style="margin-top:var(--space-4)">${t("house.b.todayTitle")}</h3>
       <p class="small muted">${t("house.b.todayIntro", { infl: a.infl })}</p>
       <div class="table-scroll" role="region" tabindex="0" aria-label="${t("house.b.todayTitle")}">${table([t("house.b.colYear"), t("house.b.colNominal"), t("house.b.colToday")], todayRows)}</div>`;
@@ -384,6 +388,7 @@ export function render(root) {
   function stageCResult(a) {
     const { r } = a;
     if (!r.fin.ok) return note("", "info", t("house.a.enter"));
+    if (!r.feasible) return note("note-danger", "triangle-alert", t("house.c.blocked"));
     if (!r.depositReady) return note("note-warn", "triangle-alert", t("house.c.noDeposit"));
     if (!r.debtFree) return note("note-warn", "triangle-alert", t("house.c.never"));
     const info = r.debtFreeInfo;
@@ -410,7 +415,7 @@ export function render(root) {
     const box = $("#charts-c");
     if (!box) return;
     const { r, units, infl } = a;
-    if (!r.fin.ok || !r.depositReady || !r.debtFree) { box.innerHTML = ""; return; }
+    if (!r.fin.ok || !r.feasible || !r.depositReady || !r.debtFree) { box.innerHTML = ""; return; }
     const pick = (y) => (units === "today" ? y.real : y.nom);
     const yearsFromBuy = r.years.filter((y) => y.key >= r.purchase.slice(0, 4) + "-01");
     const all = r.years;
@@ -499,13 +504,14 @@ export function render(root) {
       return `${head}<section class="card soon-card"><p>${t("house.needBudget")}</p><a class="btn btn-primary" href="#/budget">${t("house.needBudgetCta")}${icon("chevron-right")}</a></section>`;
     }
     lastA = analyse();
-    return `${head}<div class="stack-lg">${toolbarHtml()}${futureHtml(lastA)}${stageAHtml()}${stageBHtml()}${stageCHtml()}</div>`;
+    return `${head}<div class="stack-lg"><div id="res-overspend"></div>${toolbarHtml()}${futureHtml(lastA)}${stageAHtml()}${stageBHtml()}${stageCHtml()}</div>`;
   }
 
   function refresh() {
     if (!st().settings.startMonth) return;
     const a = analyse();
     lastA = a;
+    $("#res-overspend").innerHTML = overspendHtml({ inp: a.inp, prep: a.prep, r: a.r, categories: a.s.categories }, { onHouse: true });
     $("#res-future").innerHTML = futureResult(a);
     $("#res-a").innerHTML = stageAResult(a);
     $("#res-b").innerHTML = stageBResult(a);
@@ -532,6 +538,19 @@ export function render(root) {
     $(id).textContent = msg;
     const input = $(inputSel);
     if (msg) { input.setAttribute("aria-invalid", "true"); input.focus(); } else input.removeAttribute("aria-invalid");
+  };
+
+  /** Overspending a change would add (none if it is fine): the plan is rebuilt with the change and compared with today's. */
+  function overspendAfter(mutate) {
+    const house = JSON.parse(JSON.stringify(st().house));
+    mutate(house);
+    const inp = { ...inputFromState(st(), currentMonth()), house };
+    const r = project(inp, prepare(inp));
+    return newShortfalls(lastA.r.shortByMonth, r.shortByMonth);
+  }
+  const overspendMessage = (list) => {
+    const p = list.reduce((m, x) => (x.worst > m.worst ? x : m), list[0]);
+    return t("house.f.errOverspend", { amount: eur(Math.ceil(p.worst)), range: range(p.from, p.to) });
   };
 
   const addBtn = (kind) => `[data-action="open-form"][data-form="${kind}"]`;
@@ -578,6 +597,8 @@ export function render(root) {
       const from = $("#ss-from").value.trim(), amount = parseAmount($("#ss-amount").value);
       if (!isMonthKey(from) || from < start) return setError("#ss-error", t("house.f.errMonth", { month: formatMonth(start) }), "#ss-from");
       if (!(amount > 0)) return setError("#ss-error", t("house.f.errSalary"), "#ss-amount");
+      const worse = overspendAfter((h) => { h.salarySteps = h.salarySteps.filter((x) => x.from !== from); h.salarySteps.push({ id: "new", from, amount }); });
+      if (worse.length) return setError("#ss-error", overspendMessage(worse), "#ss-amount");
       store.update((s) => {
         s.house.salarySteps = s.house.salarySteps.filter((x) => x.from !== from);
         s.house.salarySteps.push({ id: store.newId(), from, amount });
@@ -589,6 +610,8 @@ export function render(root) {
       const from = $("#cs-from").value.trim(), amount = parseAmount($("#cs-amount").value), catId = $("#cs-cat").value;
       if (!isMonthKey(from) || from < start) return setError("#cs-error", t("house.f.errMonth", { month: formatMonth(start) }), "#cs-from");
       if (amount === null || Number.isNaN(amount)) return setError("#cs-error", t("house.f.errAmount"), "#cs-amount");
+      const worse = overspendAfter((h) => { h.costSteps = h.costSteps.filter((x) => !(x.from === from && x.catId === catId)); h.costSteps.push({ id: "new", from, catId, amount }); });
+      if (worse.length) return setError("#cs-error", overspendMessage(worse), "#cs-amount");
       store.update((s) => {
         s.house.costSteps = s.house.costSteps.filter((x) => !(x.from === from && x.catId === catId));
         s.house.costSteps.push({ id: store.newId(), from, catId, amount });
@@ -613,6 +636,11 @@ export function render(root) {
       if (!Object.keys(costs).length) {
         const first = wrap.querySelector(".ev-new:not(:disabled)");
         return setError("#ev-error", t("house.f.errNoChange"), first ? `#${first.id}` : "#ev-salary");
+      }
+      const worse = overspendAfter((h) => { h.events.push({ id: "new", name, start: startM, end: endRaw || null, salary: salaryRaw, costs }); });
+      if (worse.length) {
+        const first = wrap.querySelector(".ev-new:not(:disabled)");
+        return setError("#ev-error", overspendMessage(worse), first ? `#${first.id}` : "#ev-salary");
       }
       store.update((s) => {
         s.house.events.push({ id: store.newId(), name, start: startM, end: endRaw || null, salary: salaryRaw, costs });

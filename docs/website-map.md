@@ -20,10 +20,12 @@ BudgetPlanner helps salaried employees in Greece plan their monthly budget, save
 | Accounts | No sign-ins yet. Data is saved in the user's browser. |
 | Inflation | No automatic inflation on the budget, goals or installment. Inflation shows up through what users actually spend, which they log in the Monthly Budget. |
 | Salary | Salary never rises automatically. It changes only when the user sets a new amount from a given month; earlier months keep the old amount. |
+| Rent | From the month the first loan installment is paid, the rent in the Monthly Budget counts as €0 (its fields are locked and say why). The loan installment and the home running costs appear as a "home" card and are taken off free money instead, so the Monthly Budget and the House Planner always agree. |
 | Monthly obligations | The budget, goals and loan installment are covered by the 12 regular salaries only, as banks assume. |
 | Bonus salaries | In the Christmas, Easter and summer bonus months, the user sets the share of the bonus that is saved. Before the house is bought it goes to the deposit (shown as the first priority); after, it goes to investments. The rest is assumed spent on gifts and holidays. |
 | Money views | The investment and house planner can show amounts in future euros or in today's money. |
 | Devices | Laptop layout first, built responsive from the start so every page also works on a phone. |
+| Overspending | **Not allowed.** The plan runs on the 12 regular salaries. If any month from today on costs more than the salary (expenses, goals and, after the purchase, the installment), the site shows a red box saying which months, by how much to cut, and which categories to cut (flexible ones first), and it hides the dates, charts and net worth that rest on the overspending. Salary steps, cost steps, life events and goals that would create or worsen overspending are refused with the same advice. |
 
 ## Site map
 

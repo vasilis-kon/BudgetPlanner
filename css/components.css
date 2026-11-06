@@ -254,3 +254,14 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 999px; 
 
 /* The "add" button under a list of saved steps or events */
 .add-row { margin: var(--space-3) 0 0; }
+
+/* Overspending: a red box that cannot be missed, and what to cut */
+.card-danger { border: 2px solid var(--danger-text); background: var(--danger-bg); }
+.card-danger .card-head .icon { color: var(--danger-text); }
+.card-danger h2 { color: var(--danger-text); }
+.overspend-period { background: var(--surface); border-radius: var(--radius-sm); padding: var(--space-4); }
+.overspend-period h3 { margin-bottom: var(--space-2); }
+.overspend-period p { margin-bottom: var(--space-2); }
+.cut-list { list-style: none; margin: 0 0 var(--space-3); padding: 0; max-width: 28rem; }
+.cut-list li { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--border); }
+.badge-flex { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }

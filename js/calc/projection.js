@@ -14,7 +14,7 @@
 import {
   BONUS_MONTHS, addMonths, monthsBetween, parseMonth, salaryFor, plannedFor, actualFor,
 } from "./budget.js";
-import { goalPlan, goalContribution, paybackMonth, approvedGoals } from "./goals.js";
+import { goalPlan, goalContribution, goalLinesFor, paybackMonth, approvedGoals } from "./goals.js";
 import { createLoan, loanSummary, affordability, loanForPayment, AFFORD_OK, AFFORD_MAX } from "./loan.js";
 
 export const HORIZON = 600; // months simulated from the plan start (50 years)
@@ -118,11 +118,47 @@ function groupProblems(flags) {
     const last = out[out.length - 1];
     if (last && last.kind === f.kind && addMonths(last.to, 1) === f.key) {
       last.to = f.key;
-      last.worst = Math.max(last.worst, f.short);
+      if (f.short > last.worst + EPS) { last.worst = f.short; last.worstKey = f.key; } // equal months keep the first one
       last.months++;
-    } else out.push({ kind: f.kind, from: f.key, to: f.key, worst: f.short, months: 1 });
+    } else out.push({ kind: f.kind, from: f.key, to: f.key, worst: f.short, worstKey: f.key, months: 1 });
   }
   return out;
+}
+
+/** Months (from today on) where costs are more than the salary, as { "YYYY-MM": euros short }. */
+const shortMap = (flags) => Object.fromEntries(flags.map((f) => [f.key, f.short]));
+
+/**
+ * Months that are short in `after` but were not short in `before` (or are shorter now): the overspending a change
+ * would add. Returns ranges like problems do, so a message can say "short by up to X in March to June 2031".
+ */
+export function newShortfalls(before, after) {
+  const flags = Object.keys(after).sort()
+    .filter((k) => after[k] > (before[k] || 0) + EPS)
+    .map((k) => ({ key: k, kind: "worse", short: after[k] }));
+  return groupProblems(flags);
+}
+
+/** Everyday essentials. Anything else, including categories the user adds, is where cuts should start. */
+export const ESSENTIAL_CATEGORIES = ["rent", "groceries", "utilities", "transport", "health"];
+export const isFlexible = (id) => !ESSENTIAL_CATEGORIES.includes(id);
+
+/**
+ * Where to cut when a period overspends: the categories with what they cost in the worst month, biggest first
+ * (rent is left out once the house is bought, since the home running costs replace it), how much of that is flexible,
+ * and whether cutting all of the flexible part would be enough.
+ */
+export function cutAdvice(inp, prep, r, problem) {
+  const key = problem.worstKey || problem.from;
+  const idx = Math.max(0, Math.min(prep.H - 1, monthsBetween(inp.start, key)));
+  const row = r.rows.find((x) => x.key === key);
+  const owns = Boolean(row && row.owns);
+  const categories = prep.categoryIds
+    .map((id, k) => ({ id, amount: prep.amounts[idx][k], flexible: isFlexible(id) }))
+    .filter((c) => c.amount > 0 && !(owns && c.id === RENT_CATEGORY))
+    .sort((a, b) => b.amount - a.amount);
+  const flexibleTotal = categories.filter((c) => c.flexible).reduce((a, c) => a + c.amount, 0);
+  return { key, needed: problem.worst, owns, categories, flexibleTotal, enough: flexibleTotal + EPS >= problem.worst };
 }
 
 const ZERO_FLOWS = () => ({ pay: 0, living: 0, goals: 0, installment: 0, invested: 0, toBank: 0, bonusSpent: 0, support: 0 });
@@ -140,9 +176,22 @@ export function project(inp, prep = prepare(inp)) {
     fin, start: inp.start, today, rows: [], years: [], problems: [],
     depositReady: null, purchase: null, fixedEnd: null, termEnd: null, debtFree: null, debtFreeReason: null,
     endKey: null, retireKey: inp.endKey || null, extended: false, loanEnd: null, debtFreeInfo: null, loanFirstInstallment: null, loanLaterInstallment: null,
-    salaryAtPurchase: null, paybackFallbacks: [],
+    salaryAtPurchase: null, paybackFallbacks: [], shortByMonth: {}, feasible: true,
   };
-  if (!fin.ok) return out;
+  if (!fin.ok) {
+    // No house yet: still check that expenses and goals fit within the salary from today on.
+    const early = [];
+    for (let i = 0; i < H; i++) {
+      const key = prep.keys[i];
+      if (key < today) continue;
+      const left = prep.salary[i] - prep.spend[i] - goalLinesFor(goals, key).total;
+      if (left < -EPS) early.push({ key, kind: "expenses", short: -left });
+    }
+    out.problems = groupProblems(early);
+    out.shortByMonth = shortMap(early);
+    out.feasible = early.length === 0;
+    return out;
+  }
 
   const loanParams = { ...house.loan, amount: fin.loan };
   const goalDefs = goals.map((g) => ({ g, plan: goalPlan(g) })).filter((x) => x.plan.valid);
@@ -299,6 +348,8 @@ export function project(inp, prep = prepare(inp)) {
 
   out.endKey = out.rows.length ? out.rows[out.rows.length - 1].key : null;
   out.problems = groupProblems(flags);
+  out.shortByMonth = shortMap(flags);
+  out.feasible = flags.length === 0; // a plan that overspends in any month from today on is not a valid plan
   return out;
 }
 

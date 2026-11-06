@@ -92,11 +92,14 @@ export function effectiveSpend(months, catId, key) {
 /**
  * Everything the Monthly Budget page shows for one month.
  * `goalTotal` is what approved goals take out of the month (monthly allocations and ongoing costs).
+ * Once the house is bought, `skipCategories` (rent) count as zero and `houseTotal` (the loan installment and the
+ * home running costs) takes their place.
  */
-export function summarizeMonth({ salarySteps, categoryIds, months, bonusSharePct, goalTotal = 0 }, key) {
+export function summarizeMonth({ salarySteps, categoryIds, months, bonusSharePct, goalTotal = 0, houseTotal = 0, skipCategories = [] }, key) {
   const salary = salaryFor(salarySteps, key);
   let planned = 0, actual = 0, spent = 0, loggedCount = 0;
   for (const id of categoryIds) {
+    if (skipCategories.includes(id)) continue;
     const p = plannedFor(months, id, key).amount;
     const a = actualFor(months, id, key);
     planned += p;
@@ -111,8 +114,9 @@ export function summarizeMonth({ salarySteps, categoryIds, months, bonusSharePct
     spent,
     loggedCount,
     goalTotal,
-    free: salary - spent - goalTotal,
-    freeIfPlanned: salary - planned - goalTotal,
+    houseTotal,
+    free: salary - spent - goalTotal - houseTotal,
+    freeIfPlanned: salary - planned - goalTotal - houseTotal,
     bonus: bonus && { ...bonus, ...splitBonus(bonus.amount, bonusSharePct) },
   };
 }

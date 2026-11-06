@@ -26,7 +26,11 @@ export function buildRoadmap({ today, goals, events, result }) {
   for (const e of events) items.push({ kind: "event", id: e.id, key: e.start, name: e.name, end: e.end, href: "#/house" });
 
   if (result && result.fin && result.fin.ok) {
-    if (result.depositReady) {
+    // Dates that rest on overspending are not shown: before the purchase only overspending on expenses spoils the deposit date;
+    // any overspending spoils the dates after the purchase.
+    const overspendsBefore = result.problems.some((p) => p.kind === "expenses");
+    const overspends = result.problems.length > 0;
+    if (result.depositReady && !overspendsBefore) {
       let progress = 0;
       if (today >= result.depositReady) progress = 1;
       else {
@@ -35,11 +39,11 @@ export function buildRoadmap({ today, goals, events, result }) {
       }
       items.push({ kind: "deposit", key: result.depositReady, cashNeeded: result.fin.cashNeeded, progress, href: "#/house" });
     }
-    if (result.purchase) items.push({ kind: "purchase", key: result.purchase, href: "#/house" });
-    if (result.fixedEnd && result.endKey && result.fixedEnd <= result.endKey) items.push({ kind: "fixedEnd", key: result.fixedEnd, href: "#/house" });
-    if (result.debtFree) items.push({ kind: "debtFree", key: result.debtFree, reason: result.debtFreeReason, href: "#/overview" });
+    if (result.purchase && !overspendsBefore) items.push({ kind: "purchase", key: result.purchase, href: "#/house" });
+    if (!overspends && result.fixedEnd && result.endKey && result.fixedEnd <= result.endKey) items.push({ kind: "fixedEnd", key: result.fixedEnd, href: "#/house" });
+    if (!overspends && result.debtFree) items.push({ kind: "debtFree", key: result.debtFree, reason: result.debtFreeReason, href: "#/overview" });
     // The loan keeps being paid after the debt-free declaration; its last installment is a milestone too.
-    if (result.debtFree && result.loanEnd && result.loanEnd > result.debtFree) items.push({ kind: "loanEnd", key: result.loanEnd, href: "#/overview" });
+    if (!overspends && result.debtFree && result.loanEnd && result.loanEnd > result.debtFree) items.push({ kind: "loanEnd", key: result.loanEnd, href: "#/overview" });
   }
 
   items.sort((a, b) => a.key.localeCompare(b.key) || ORDER[a.kind] - ORDER[b.kind]);
