@@ -11,11 +11,12 @@ import * as landing from "./pages/landing.js";
 import * as info from "./pages/info.js";
 
 const ROUTES = {
-  home: { page: home, icon: "map-pinned" },
+  // Menu order follows the flow: track the month, plan goals, plan the house, then see the results.
   budget: { page: budget, icon: "wallet" },
   goals: { page: goals, icon: "target" },
   house: { page: house, icon: "house" },
   overview: { page: overview, icon: "chart-line" },
+  home: { page: home, icon: "map-pinned" },
   // Pages outside the main menu: reached from the footer, the welcome page and links in the text.
   welcome: { page: landing, nav: false },
   about: { page: info.about, nav: false },
@@ -23,7 +24,7 @@ const ROUTES = {
   terms: { page: info.terms, nav: false },
   disclaimer: { page: info.disclaimer, nav: false },
 };
-const DEFAULT_ROUTE = "home";
+const DEFAULT_ROUTE = "welcome"; // where the site opens, and where unknown addresses go
 
 const $ = (id) => document.getElementById(id);
 let cleanup = null;
@@ -40,7 +41,7 @@ function renderHeader() {
     .join("");
   $("site-header").innerHTML = `
     <div class="header-inner">
-      <a class="brand" href="#/home">${icon("piggy-bank", { size: 24 })}<span>${t("app.name")}</span></a>
+      <a class="brand" href="#/welcome">${icon("piggy-bank", { size: 24 })}<span>${t("app.name")}</span></a>
       <nav class="main-nav" id="main-nav" aria-label="${t("nav.label")}"><ul>${nav}</ul></nav>
       <div class="header-actions">
         <button type="button" class="btn btn-quiet btn-icon" id="theme-toggle"></button>
@@ -187,8 +188,7 @@ function start() {
     syncToggle();
   });
   window.addEventListener("hashchange", onHashChange);
-  // First-time visitors (no plan yet) get the welcome page; everyone else lands on their roadmap.
-  if (!location.hash) history.replaceState(null, "", "#/" + (store.getState().settings.startMonth ? DEFAULT_ROUTE : "welcome"));
+  if (!location.hash) history.replaceState(null, "", "#/" + DEFAULT_ROUTE);
   render();
 }
 

@@ -14,11 +14,11 @@ The full specification is in [docs/website-map.md](docs/website-map.md).
 
 | Page | What it does |
 | --- | --- |
-| Home | Your roadmap: goals, life events, deposit ready, house purchase, end of the fixed-rate period and debt-free on one timeline, with a "you are here" marker. Each step opens the page it belongs to. |
 | Monthly Budget | Salary (changes apply from a chosen month), categories with icons, planned vs. actual, bonus share, free money, and the lines approved goals add. |
 | Goals | Any number of goals. Each is checked against free money, shows how it moves the deposit date, and joins the budget once approved. |
 | House Planner | Your expected future (salary steps, cost steps, life events with required cost changes, installment check), then Stage A save the deposit, Stage B size the loan, Stage C invest until debt-free, with charts. Enter your age and the charts run until 65. |
-| Overview | Bank, investments, home, loan and net worth at the end of each year (until 65 once you enter your age), one timeline bar, and a year-by-year table. |
+| Financial Overview | Bank, investments, home, loan and net worth at the end of each year (until 65 once you enter your age), one timeline bar, and a year-by-year table. |
+| Roadmap | Your roadmap: goals, life events, deposit ready, house purchase, end of the fixed-rate period and debt-free on one timeline, with a "you are here" marker. Each step opens the page it belongs to. |
 
 The plan never allows overspending: if any month costs more than the regular salary, the site says which months, how much to cut and where (flexible categories first), refuses entries that would make it worse, and hides the dates and charts that depend on it. You are debt-free in the first month your investments, after tax on gains, cover what is still owed on the loan: you could pay it all off if you wanted to. The plan does not sell anything. The installments keep paying the loan down, and the loan and the portfolio are tracked until the loan ends (or you are 65).
 

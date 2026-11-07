@@ -65,7 +65,7 @@ for (const variant of ["empty", "basic", "full", "short"]) {
     }
     if (variant === "short" && name === "home") {
       expect["home shows the red box"] = (o) => o.text.includes("Your plan overspends");
-      expect["home hides debt-free and loan end"] = (o) => !o.text.includes("Loan fully repaid") && !o.text.includes("Open Overview");
+      expect["home hides debt-free and loan end"] = (o) => !o.text.includes("Loan fully repaid") && !o.text.includes("Open Financial Overview");
     }
     if ((variant === "full" || variant === "basic") && ["house", "overview", "home"].includes(name)) {
       expect["a plan that covers its costs shows no red box"] = (o) => !o.root.querySelector(".card-danger");

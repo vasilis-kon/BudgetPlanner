@@ -81,12 +81,18 @@ main {
 .stack-lg > * + * { margin-top: var(--space-5); }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 
-.site-footer { border-top: 1px solid var(--border); background: var(--surface); }
+.site-footer { background: var(--header-bg); color: var(--header-text); border-top: 3px solid var(--primary); }
 .footer-inner {
-  max-width: var(--max-width); margin: 0 auto; padding: var(--space-4);
-  display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between;
+  max-width: var(--max-width); margin: 0 auto; padding: var(--space-5) var(--space-4);
+  display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; justify-content: space-between;
 }
 .footer-inner p { margin: 0; }
+.footer-inner .muted { color: #c7d4f5; }
+.site-footer a { color: #b4cbff; }
+.site-footer a:hover { color: #ffffff; }
+.site-footer :focus-visible { outline-color: #bcd0ff; }
+.site-footer .btn { background: transparent; color: var(--header-text); border-color: #6f86c9; }
+.site-footer .btn:hover { background: var(--header-hover); border-color: #9db9ff; }
 
 .site-header .btn-quiet { color: var(--header-text); }
 .site-header .btn-quiet:hover { background: var(--header-hover); }

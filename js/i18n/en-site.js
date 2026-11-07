@@ -20,7 +20,7 @@ export default {
     ctaNew: "Start planning",
     ctaBack: "Open your roadmap",
     trust: ["No account and no sign-up", "Your data never leaves your browser", "Free to use"],
-    heroAlt: "The Overview page, showing savings, investments, the home and the loan year by year.",
+    heroAlt: "The Financial Overview page, showing savings, investments, the home and the loan year by year.",
     howTitle: "How it works",
     steps: [
       { t: "Set up your month", d: "Enter your net monthly salary and your usual expenses. See what is left over each month." },

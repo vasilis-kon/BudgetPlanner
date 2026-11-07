@@ -7,11 +7,11 @@ const base = {
   nav: {
     label: "Main",
     menu: "Menu",
-    home: "Home",
+    home: "Roadmap",
     budget: "Monthly Budget",
     goals: "Goals",
     house: "House Planner",
-    overview: "Overview",
+    overview: "Financial Overview",
   },
   theme: { toggleToDark: "Switch to dark mode", toggleToLight: "Switch to light mode" },
   footer: {
@@ -567,7 +567,7 @@ const base = {
     },
   },
   overview: {
-    title: "Overview",
+    title: "Financial Overview",
     intro: "Where your money sits at the end of each year, from your first salary to the day you could pay off the loan (debt-free), and on until the loan ends or you are 65 once you enter your age in the House Planner.",
     needBudget: "The overview needs your salary and expenses, so set up your Monthly Budget first.",
     needBudgetCta: "Open Monthly Budget",
