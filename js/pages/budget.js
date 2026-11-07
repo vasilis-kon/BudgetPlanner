@@ -1,4 +1,4 @@
-// Page 1: Monthly Budget. Salary, expense categories, planned vs actual, bonus share, free money.
+// Budget Plan: the baselines. Salary, what you expect to spend per category (carried forward until changed), goals, bonus share, free money.
 import { t, formatMoney as eur, formatMonth, formatMonthShort } from "../i18n/index.js";
 import { icon, PICKABLE } from "../components/icon.js";
 import { esc, parseAmount } from "../components/dom.js";
@@ -7,17 +7,14 @@ import { monthField } from "../components/month-picker.js";
 import * as store from "../store.js";
 import {
   BONUS_MONTHS, addMonths, isMonthKey, monthKey, monthsBetween, parseMonth,
-  actualFor, bonusForSalary, splitBonus,
+  bonusForSalary, splitBonus,
 } from "../calc/budget.js";
 import { inputFromState, prepare, project, monthPicture, plannedDetail } from "../calc/projection.js";
+import { PLAN_MONTHS, getSelected, setSelected, currentMonth, endMonth, clampMonth } from "../components/selected-month.js";
 
-const PLAN_MONTHS = 360; // the month picker covers 30 years from the start month
-let selected = null; // month being viewed; kept while moving between pages
+let selected = null; // month being viewed (mirrors the shared selected month)
 
 const catName = (c) => (c.builtin ? t("cat." + c.id) : c.name);
-const currentMonth = () => { const d = new Date(); return monthKey(d.getFullYear(), d.getMonth() + 1); };
-const endMonth = (st) => addMonths(st.settings.startMonth, PLAN_MONTHS - 1);
-const clampMonth = (st, k) => { const a = st.settings.startMonth, b = endMonth(st); return k < a ? a : k > b ? b : k; };
 
 export function render(root) {
   const wrap = document.createElement("div");
@@ -66,22 +63,20 @@ export function render(root) {
   }
 
   function freeInner(sum) {
-    const total = state().categories.length - Object.keys(pic.replacedBy).length; // replaced expenses are not counted
-    const cls = sum.free > 0.005 ? "positive" : sum.free < -0.005 ? "negative" : "zero";
-    const status = cls === "positive" ? t("budget.free.positive") : cls === "zero" ? t("budget.free.zero") : t("budget.free.negative", { amount: eur(-sum.free) });
-    const basis = sum.loggedCount === 0 ? t("budget.free.basisPlan")
-      : sum.loggedCount < total ? t("budget.free.basisMixed", { logged: sum.loggedCount, total })
-      : t("budget.free.basisActual");
+    const free = sum.freeIfPlanned; // this page is the plan: what is left once every baseline is spent
+    const cls = free > 0.005 ? "positive" : free < -0.005 ? "negative" : "zero";
+    const status = cls === "positive" ? t("budget.free.positive") : cls === "zero" ? t("budget.free.zero") : t("budget.free.negative", { amount: eur(-free) });
+    const basis = t("budget.free.basisPlan");
     return {
       cls,
       html: `
         <div class="card-head">${icon("wallet")}<h2 id="free-h">${t("budget.free.title")}</h2></div>
         <p class="stat-label">${t("budget.free.label")}</p>
-        <p class="stat-value">${eur(sum.free)}</p>
+        <p class="stat-value">${eur(free)}</p>
         <p class="stat-sub" role="status">${icon(cls === "positive" ? "check" : "triangle-alert", { size: 16 })} ${status}</p>
-        ${cls === "negative" && selected >= currentMonth() ? `<p class="stat-sub"><strong>${t("budget.free.cutAdvice", { amount: eur(Math.ceil(-sum.free)) })}</strong></p>` : ""}
+        ${cls === "negative" && selected >= currentMonth() ? `<p class="stat-sub"><strong>${t("budget.free.cutAdvice", { amount: eur(Math.ceil(-free)) })}</strong></p>` : ""}
         <p class="stat-sub">${basis}</p>
-        <p class="stat-sub">${t("budget.free.salary")} ${eur(sum.salary)} − ${t("budget.free.spent")} ${eur(sum.spent)} − ${t("budget.free.goals")} ${eur(sum.goalTotal)}${sum.houseTotal > 0 ? ` − ${t("budget.free.home")} ${eur(sum.houseTotal)}` : ""}</p>
+        <p class="stat-sub">${t("budget.free.salary")} ${eur(sum.salary)} − ${t("budget.free.spent")} ${eur(sum.planned)} − ${t("budget.free.goals")} ${eur(sum.goalTotal)}${sum.houseTotal > 0 ? ` − ${t("budget.free.home")} ${eur(sum.houseTotal)}` : ""}</p>
         <p class="stat-sub">${t("budget.free.goalsNote")}</p>`,
     };
   }
@@ -156,19 +151,6 @@ export function render(root) {
       <p class="small muted" style="margin-top:var(--space-2)">${t("budget.salary.earlierNote")}</p>`;
   }
 
-  function diffHtml(catId) {
-    const st = state();
-    const rep = replacement(catId);
-    if (rep) return `<span class="diff none">${replacedText(rep)}</span>`;
-    const a = actualFor(st.months, catId, selected);
-    if (a === null) return `<span class="diff none">${t("budget.expenses.notLogged")}</span>`;
-    const d = a - plannedDetail(plan.inp, catId, selected).amount;
-    if (Math.abs(d) < 0.005) return `<span class="diff none">${t("budget.expenses.onPlan")}</span>`;
-    return d > 0
-      ? `<span class="diff over">+${eur(d)} ${t("budget.expenses.over")}</span>`
-      : `<span class="diff under">−${eur(-d)} ${t("budget.expenses.under")}</span>`;
-  }
-
   function plannedAttrs(cat) {
     const d = plannedDetail(plan.inp, cat.id, selected);
     const base = t("budget.expenses.plannedFor", { name: catName(cat) });
@@ -196,24 +178,20 @@ export function render(root) {
         <tr>
           <th scope="row"><span class="cat"><span class="cat-icon">${icon(c.icon)}</span>${esc(catName(c))}</span></th>
           <td class="num" data-label="${t("budget.expenses.planned")}">${moneyInput({ id: `planned-${c.id}`, value: 0, ariaLabel: label, dataAttrs: "disabled" })}</td>
-          <td class="num" data-label="${t("budget.expenses.actual")}">${moneyInput({ id: `actual-${c.id}`, value: "", ariaLabel: label, dataAttrs: "disabled" })}</td>
-          <td class="num" data-label="${t("budget.expenses.difference")}" id="diff-${c.id}">${diffHtml(c.id)}</td>
         </tr>`;
       }
       const p = plannedAttrs(c);
-      const a = actualFor(st.months, c.id, selected);
       return `
         <tr>
           <th scope="row"><span class="cat"><span class="cat-icon">${icon(c.icon)}</span>${esc(catName(c))}</span>${p.note ? `<span class="cat-note">${esc(p.note)}</span>` : ""}</th>
           <td class="num" data-label="${t("budget.expenses.planned")}">${moneyInput({ id: `planned-${c.id}`, value: p.value, ariaLabel: p.label, className: p.locked ? "" : p.inherited ? "js-planned inherited" : "js-planned", dataAttrs: `data-cat="${c.id}" ${p.locked ? "disabled" : ""}` })}</td>
-          <td class="num" data-label="${t("budget.expenses.actual")}">${moneyInput({ id: `actual-${c.id}`, value: a, ariaLabel: t("budget.expenses.actualFor", { name: catName(c) }), className: "js-actual", dataAttrs: `data-cat="${c.id}"` })}</td>
-          <td class="num" data-label="${t("budget.expenses.difference")}" id="diff-${c.id}">${diffHtml(c.id)}</td>
         </tr>`;
     }).join("");
     return `
       <h2 id="exp-h">${t("budget.expenses.title")}</h2>
       <p class="muted">${t("budget.expenses.intro")}</p>
       <p class="small muted">${t("budget.expenses.carriedHint")}</p>
+      <p class="small"><a href="#/tracker">${t("budget.expenses.trackerLink")}</a></p>
       ${Object.entries(pic.replacedBy).map(([id, rep]) => {
         const c = st.categories.find((x) => x.id === id);
         if (!c) return "";
@@ -226,13 +204,11 @@ export function render(root) {
           <thead><tr>
             <th scope="col">${t("budget.expenses.category")}</th>
             <th scope="col" class="num">${t("budget.expenses.planned")}</th>
-            <th scope="col" class="num">${t("budget.expenses.actual")}</th>
-            <th scope="col" class="num">${t("budget.expenses.difference")}</th>
           </tr></thead>
           <tbody>${rows}</tbody>
           <tfoot><tr>
             <th scope="row">${t("budget.expenses.total")}</th>
-            <td class="num" id="total-planned"></td><td class="num" id="total-actual"></td><td class="num" id="total-diff"></td>
+            <td class="num" id="total-planned"></td>
           </tr></tfoot>
         </table>
       </div>`;
@@ -342,7 +318,9 @@ export function render(root) {
     if (!st.settings.startMonth) {
       wrap.innerHTML = setupHtml();
     } else {
-      selected = clampMonth(st, selected && isMonthKey(selected) ? selected : currentMonth());
+      const shared = getSelected();
+      selected = clampMonth(st, shared && isMonthKey(shared) ? shared : currentMonth());
+      setSelected(selected);
       computePlan();
       drawnKey = replacedKey();
       wrap.innerHTML = mainHtml();
@@ -356,7 +334,6 @@ export function render(root) {
 
   /** Updates the numbers that change while typing, without redrawing (so focus is kept). */
   function refresh() {
-    const st = state();
     computePlan(); // what you plan to spend decides when you can buy, which can change what this month looks like
     if (replacedKey() !== drawnKey) {
       const id = document.activeElement && wrap.contains(document.activeElement) ? document.activeElement.id : "";
@@ -368,17 +345,7 @@ export function render(root) {
     const card = $("#free-card");
     card.className = `card free-card ${free.cls}`;
     card.innerHTML = free.html;
-    let diff = 0;
-    for (const c of st.categories) {
-      const cell = $(`#diff-${c.id}`);
-      if (cell) cell.innerHTML = diffHtml(c.id);
-      const a = actualFor(st.months, c.id, selected);
-      if (a !== null && !replacement(c.id)) diff += a - plannedDetail(plan.inp, c.id, selected).amount;
-    }
     $("#total-planned").textContent = eur(sum.planned);
-    $("#total-actual").textContent = sum.loggedCount ? eur(sum.actual) : "–";
-    $("#total-diff").innerHTML = sum.loggedCount
-      ? `<span class="diff ${diff > 0.005 ? "over" : diff < -0.005 ? "under" : "none"}">${diff > 0.005 ? "+" : diff < -0.005 ? "−" : ""}${eur(Math.abs(diff))}</span>` : "–";
   }
 
   function syncPlannedInput(input) {
@@ -393,6 +360,7 @@ export function render(root) {
     const st = state();
     if (!isMonthKey(k) || k < st.settings.startMonth || k > endMonth(st)) { $("#month-input").value = selected; return; }
     selected = k;
+    setSelected(k);
     salaryFormOpen = false;
     draw("#month-input");
   }
@@ -421,7 +389,10 @@ export function render(root) {
       if (!cat || !window.confirm(t("budget.categories.removeConfirm", { name: cat.name }))) return;
       store.update((s) => {
         s.categories = s.categories.filter((c) => c.id !== cat.id);
-        for (const m of Object.values(s.months)) { delete m.planned[cat.id]; delete m.actual[cat.id]; }
+        for (const m of Object.values(s.months)) {
+          delete m.planned[cat.id];
+          for (const it of m.items) if (it.catId === cat.id) it.catId = "other"; // logged expenses are kept, under Other
+        }
         // Expected cost changes in the House Planner that point at this category go too.
         s.house.costSteps = s.house.costSteps.filter((x) => x.catId !== cat.id);
         for (const e of s.house.events) delete e.costs[cat.id];
@@ -444,6 +415,7 @@ export function render(root) {
       if (!(salary > 0)) return setError("#setup-error", t("budget.setup.salaryError"), "#setup-salary");
       store.update((s) => { s.settings.startMonth = start; s.salary = [{ from: start, amount: salary }]; });
       selected = clampMonth(state(), currentMonth());
+      setSelected(selected);
       draw("#month-input");
     } else if (form.id === "salary-form") {
       const v = parseAmount($("#salary-new").value);
@@ -468,16 +440,15 @@ export function render(root) {
 
   wrap.addEventListener("input", (e) => {
     const el = e.target;
-    if (el.classList.contains("js-planned") || el.classList.contains("js-actual")) {
-      const kind = el.classList.contains("js-planned") ? "planned" : "actual";
+    if (el.classList.contains("js-planned")) {
       const v = parseAmount(el.value);
       if (Number.isNaN(v)) { el.setAttribute("aria-invalid", "true"); return; }
       el.removeAttribute("aria-invalid");
       store.update((s) => {
-        const m = (s.months[selected] ||= { planned: {}, actual: {} });
-        if (v === null) delete m[kind][el.dataset.cat]; else m[kind][el.dataset.cat] = v;
+        const m = (s.months[selected] ||= { planned: {}, items: [] });
+        if (v === null) delete m.planned[el.dataset.cat]; else m.planned[el.dataset.cat] = v;
       });
-      if (kind === "planned" && v !== null) el.classList.remove("inherited");
+      if (v !== null) el.classList.remove("inherited");
       refresh();
     } else if (el.id === "bonus-share") {
       const v = parseAmount(el.value);
@@ -494,6 +465,7 @@ export function render(root) {
       if (!isMonthKey(el.value)) { el.value = state().settings.startMonth; return; }
       store.update((s) => { s.settings.startMonth = el.value; });
       selected = clampMonth(state(), selected);
+      setSelected(selected);
       draw("#start-input");
     } else if (el.classList.contains("js-planned") && el.value.trim() === "") syncPlannedInput(el);
     else if (el.id === "bonus-share") {

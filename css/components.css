@@ -31,7 +31,7 @@
 .field > label, .field > .label, legend { font-weight: 600; font-size: var(--text-sm); }
 .field .hint { color: var(--text-muted); font-size: var(--text-sm); }
 .field .error { color: var(--danger-text); font-size: var(--text-sm); font-weight: 500; }
-input[type="text"], input[type="number"], input[type="month"], select {
+input[type="text"], input[type="number"], input[type="month"], input[type="date"], select {
   font: inherit; color: var(--text); background: var(--surface);
   min-height: var(--tap); padding: 0 var(--space-3);
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm); width: 100%;
@@ -104,6 +104,22 @@ table.expenses { width: 100%; border-collapse: collapse; }
   .expenses td.num { text-align: right; }
   .expenses tbody th[scope="row"], .expenses tfoot th[scope="row"] { display: block; border: 0; padding: 0 0 var(--space-2); }
   .expenses input { max-width: 8rem; }
+}
+
+/* Monthly Tracker: the purchase list reads like a spreadsheet; the add row is tinted */
+.ledger td.ledger-icon { width: 3.25rem; }
+.ledger td.ledger-act { width: 1%; white-space: nowrap; text-align: right; }
+.ledger input[type="text"], .ledger input[type="date"], .ledger select { max-width: none; text-align: left; min-height: 2.5rem; }
+.ledger td.num input { text-align: right; max-width: 8rem; }
+.ledger .add-row td { background: var(--surface-2); border-bottom: 2px solid var(--border-strong); }
+.used { display: inline-flex; align-items: center; gap: var(--space-2); justify-content: flex-end; }
+.used progress { width: 6rem; }
+.used .num { min-width: 3.25ch; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 39.99rem) {
+  .ledger td input, .ledger td select { flex: 1; max-width: 14rem; min-width: 0; }
+  .ledger td.num input { max-width: 8rem; }
+  .ledger td.ledger-icon, .ledger td.ledger-act { width: auto; text-align: left; }
+  .ledger tfoot th[scope="row"] { padding-bottom: 0; }
 }
 
 /* Chips, lists */

@@ -4,6 +4,7 @@ import { icon } from "./components/icon.js";
 import * as store from "./store.js";
 import * as home from "./pages/home.js";
 import * as budget from "./pages/budget.js";
+import * as tracker from "./pages/tracker.js";
 import * as goals from "./pages/goals.js";
 import * as house from "./pages/house.js";
 import * as overview from "./pages/overview.js";
@@ -11,8 +12,9 @@ import * as landing from "./pages/landing.js";
 import * as info from "./pages/info.js";
 
 const ROUTES = {
-  // Menu order follows the flow: track the month, plan goals, plan the house, then see the results.
+  // Menu order follows the flow: set the baselines, track the month, plan goals, plan the house, then see the results.
   budget: { page: budget, icon: "wallet" },
+  tracker: { page: tracker, icon: "receipt" },
   goals: { page: goals, icon: "target" },
   house: { page: house, icon: "house" },
   overview: { page: overview, icon: "chart-line" },

@@ -1,6 +1,6 @@
 // Tests for the pure money logic in js/calc/ and the data cleaning in js/store.js.
 // No test framework: each test throws on failure and the page lists PASS/FAIL.
-import { addMonths, monthsBetween, summarizeMonth } from "../js/calc/budget.js";
+import { addMonths, monthsBetween, summarizeMonth, actualFor, itemsFor } from "../js/calc/budget.js";
 import { pmt, createLoan, loanSummary, affordability, loanForPayment } from "../js/calc/loan.js";
 import { goalPlan, goalContribution, goalLinesFor, checkGoal, approvedGoals, replacedCategories, budgetFreeFn } from "../js/calc/goals.js";
 import { prepare, project, projectSavings, houseFinance, inputFromState, supportSweep, loanMonths, todayFactor, newShortfalls, cutAdvice, isFlexible, monthPicture, plannedDetail } from "../js/calc/projection.js";
@@ -752,6 +752,58 @@ test("savings view: overspending is flagged, and the age sets the end of the vie
 test("savings view: today's euros are smaller than future euros", () => {
   const y = savings(noHouse()).years.at(-1);
   is(y.real.netWorth < y.nom.netWorth, "deflated total is smaller");
+});
+
+/* ---------- the Monthly Tracker's data: logged items, migration, and how they reach the plan ---------- */
+test("actual spending is the sum of a category's logged items, or null when there are none", () => {
+  const months = { [TODAY]: { planned: {}, items: [
+    { id: "a", date: `${TODAY}-05`, name: "Flights", catId: "travel", amount: 120.1 },
+    { id: "b", date: `${TODAY}-02`, name: "Hotel", catId: "travel", amount: 200.2 },
+    { id: "c", date: null, name: "Misc", catId: "other", amount: 10 },
+  ] } };
+  near(actualFor(months, "travel", TODAY), 320.3, 1e-9, "travel total");
+  eq(actualFor(months, "rent", TODAY), null, "nothing logged for rent");
+  eq(actualFor(months, "travel", "2030-01"), null, "another month");
+  eq(itemsFor(months, TODAY).map((i) => i.id).join(""), "bac", "oldest first, undated last");
+});
+test("a saved plan keeps its logged items and drops invalid ones", () => {
+  const st = emptyState(); st.settings.startMonth = TODAY;
+  st.months[TODAY] = { planned: { travel: 100 }, items: [
+    { id: "ok", date: `${TODAY}-09`, name: "Tickets to London", catId: "travel", amount: 150 },
+    { id: "bad-cat", date: null, name: "x", catId: "nope", amount: 5 },
+    { id: "bad-amt", date: null, name: "x", catId: "travel", amount: -5 },
+    { id: "bad-date", date: "2031-01-01", name: "Elsewhere", catId: "travel", amount: 7 },
+  ] };
+  const clean = sanitize(JSON.parse(JSON.stringify(st)));
+  const items = clean.months[TODAY].items;
+  eq(items.length, 2, "two valid items");
+  eq(items[0].name, "Tickets to London"); eq(items[1].date, null, "a date outside the month is dropped");
+});
+test("old backups with one actual total per category become one logged item each", () => {
+  const st = emptyState(); st.settings.startMonth = TODAY;
+  const raw = JSON.parse(JSON.stringify(st));
+  raw.months[TODAY] = { planned: { groceries: 300 }, actual: { groceries: 280, eating: 0 } };
+  const clean = sanitize(raw);
+  eq(clean.months[TODAY].items.length, 1, "the zero total is not an item");
+  near(actualFor(clean.months, "groceries", TODAY), 280, 1e-9);
+  is(!("actual" in clean.months[TODAY]), "the old field is gone");
+});
+test("Travel is a built-in category with a plane icon", () => {
+  const c = emptyState().categories.find((x) => x.id === "travel");
+  is(c && c.icon === "plane" && c.builtin, "travel exists");
+});
+test("spending logged in a finished month replaces its baseline in the projection; the current month always uses the baseline", () => {
+  const st = baseState();
+  st.settings.startMonth = "2026-09";
+  st.months["2026-09"] = { planned: { rent: 600, groceries: 300 }, items: [{ id: "g1", date: null, name: "Shop", catId: "groceries", amount: 450 }] };
+  st.months[TODAY] = { planned: {}, items: [{ id: "g2", date: null, name: "Shop", catId: "groceries", amount: 100 }] };
+  const prep = prepare(inputFromState(st, TODAY));
+  const g = prep.categoryIds.indexOf("groceries");
+  eq(prep.amounts[0][g], 450, "a finished month counts what was spent");
+  eq(prep.amounts[2][g], 300, "this month: 100 spent so far, but the month is not over, so the baseline stands");
+  st.months[TODAY].items[0].amount = 400;
+  eq(prepare(inputFromState(st, TODAY)).amounts[2][g], 300, "this month: even overspending does not change the projection until the month ends");
+  eq(prepare(inputFromState(st, addMonths(TODAY, 1))).amounts[2][g], 400, "once next month starts, this month counts what was really spent");
 });
 
 /* ---------- report ---------- */

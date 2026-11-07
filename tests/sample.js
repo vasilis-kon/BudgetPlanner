@@ -15,12 +15,20 @@ export function buildSample(variant = "full", { theme = "system", now = new Date
       { id: "utilities", icon: "zap", builtin: true }, { id: "transport", icon: "bus", builtin: true },
       { id: "health", icon: "heart-pulse", builtin: true }, { id: "eating", icon: "utensils", builtin: true },
       { id: "subscriptions", icon: "repeat", builtin: true }, { id: "leisure", icon: "ticket", builtin: true },
+      { id: "travel", icon: "plane", builtin: true },
       { id: "clothing", icon: "shirt", builtin: true }, { id: "other", icon: "circle-ellipsis", builtin: true },
     ],
-    months: { [start]: { planned: { rent: 600, groceries: 300, utilities: 120, transport: 80, eating: 60, subscriptions: 20, leisure: 80, other: 40 }, actual: {} } },
+    months: { [start]: { planned: { rent: 600, groceries: 300, utilities: 120, transport: 80, eating: 60, subscriptions: 20, leisure: 80, other: 40 }, items: [] } },
     goals: [],
     house: {},
   };
+  if (variant !== "empty") { // a few purchases in the first month, for the Monthly Tracker (all under their baselines)
+    state.months[start].items = [
+      { id: "i1", date: `${start}-01`, name: "Supermarket", catId: "groceries", amount: 62.4 },
+      { id: "i2", date: `${start}-02`, name: "Dinner with friends", catId: "eating", amount: 35 },
+      { id: "i3", date: `${start}-03`, name: "Tickets to London", catId: "travel", amount: 180 },
+    ];
+  }
   if (variant !== "empty" && variant !== "goals") state.house = { mode: "price", amount: variant === "short" ? 300000 : 150000, ltvPct: 80, costsPct: 7, buffer: 5000 };
   if (variant === "goals") {
     state.goals = [

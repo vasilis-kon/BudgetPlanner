@@ -83,10 +83,19 @@ export function plannedFor(months, catId, key) {
     : { amount: months[bestKey].planned[catId], from: bestKey };
 }
 
-/** Actual logged for a category in a month, or null if nothing was logged. */
+/** The expenses logged in a month, oldest first (items without a date go last, in the order they were added). */
+export function itemsFor(months, key) {
+  const items = months[key]?.items || [];
+  return items.map((it, i) => ({ it, i })).sort((a, b) => (a.it.date || "9999").localeCompare(b.it.date || "9999") || a.i - b.i).map((x) => x.it);
+}
+
+/** Actual spending on a category in a month: the sum of its logged items, or null if there are none. */
 export function actualFor(months, catId, key) {
-  const v = months[key]?.actual?.[catId];
-  return isNum(v) ? v : null;
+  let sum = 0, n = 0;
+  for (const it of months[key]?.items || []) {
+    if (it.catId === catId && isNum(it.amount)) { sum += it.amount; n++; }
+  }
+  return n ? Math.round(sum * 100) / 100 : null;
 }
 
 /** What counts as spent: the actual if logged, otherwise the plan. */

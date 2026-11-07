@@ -14,6 +14,7 @@ export const DEFAULT_CATEGORIES = [
   { id: "eating", icon: "utensils", builtin: true },
   { id: "subscriptions", icon: "repeat", builtin: true },
   { id: "leisure", icon: "ticket", builtin: true },
+  { id: "travel", icon: "plane", builtin: true },
   { id: "clothing", icon: "shirt", builtin: true },
   { id: "other", icon: "circle-ellipsis", builtin: true },
 ];
@@ -45,7 +46,7 @@ export function emptyState() {
     settings: { startMonth: null, bonusSharePct: 50, theme: "system" },
     salary: [], // [{ from: "YYYY-MM", amount }]
     categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })),
-    months: {}, // { "YYYY-MM": { planned: { catId: €ish }, actual: { catId: € } } }
+    months: {}, // { "YYYY-MM": { planned: { catId: € baseline from this month }, items: [{ id, date: "YYYY-MM-DD"|null, name, catId, amount }] } }
     goals: [], // [{ id, approved, data: goal fields | null, draft: goal fields | null }]
     house: defaultHouse(),
   };
@@ -83,9 +84,25 @@ export function sanitize(raw) {
   if (raw.months && typeof raw.months === "object") {
     for (const [k, m] of Object.entries(raw.months)) {
       if (!isMonthKey(k) || !m || typeof m !== "object") continue;
-      const out = { planned: {}, actual: {} };
-      for (const kind of ["planned", "actual"]) {
-        for (const [id, v] of Object.entries(m[kind] || {})) if (valid.has(id) && num(v) && v >= 0) out[kind][id] = v;
+      const out = { planned: {}, items: [] };
+      for (const [id, v] of Object.entries(m.planned || {})) if (valid.has(id) && num(v) && v >= 0) out.planned[id] = v;
+      // Older backups kept one "actual" total per category: it becomes a single logged item.
+      for (const [id, v] of Object.entries(m.actual || {})) {
+        if (valid.has(id) && num(v) && v > 0) out.items.push({ id: newId(), date: null, name: "Logged total", catId: id, amount: v });
+      }
+      const seen = new Set();
+      for (const it of Array.isArray(m.items) ? m.items : []) {
+        if (!it || typeof it !== "object" || !valid.has(it.catId) || !num(it.amount) || it.amount <= 0 || it.amount > 1e9) continue;
+        let id = idOf(it.id);
+        while (seen.has(id)) id = newId();
+        seen.add(id);
+        out.items.push({
+          id,
+          date: typeof it.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(it.date) && it.date.startsWith(k) ? it.date : null,
+          name: text(it.name, 80),
+          catId: it.catId,
+          amount: Math.round(it.amount * 100) / 100,
+        });
       }
       s.months[k] = out;
     }

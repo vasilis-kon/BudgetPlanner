@@ -14,7 +14,8 @@ The full specification is in [docs/website-map.md](docs/website-map.md).
 
 | Page | What it does |
 | --- | --- |
-| Monthly Budget | Salary (changes apply from a chosen month), categories with icons, planned vs. actual, bonus share, free money, and the lines approved goals add. |
+| Budget Plan | The baselines: salary (changes apply from a chosen month), a monthly baseline per category with icons (carried forward until changed here or by a life event), bonus share, free money, and the lines approved goals add. |
+| Monthly Tracker | A spreadsheet-style list of the month's purchases, each with a category icon, and a table comparing every category with its baseline for that month. |
 | Goals | Any number of goals. Each is checked against free money, shows how it moves the deposit date, and joins the budget once approved. |
 | House Planner | Your expected future (salary steps, cost steps, life events with required cost changes, installment check), then Stage A save the deposit, Stage B size the loan, Stage C invest until debt-free, with charts. Enter your age and the charts run until 65. |
 | Financial Overview | Bank, investments, home, loan and net worth at the end of each year (until 65 once you enter your age), one timeline bar, and a year-by-year table. |

@@ -16,15 +16,16 @@ export default {
   welcome: {
     eyebrow: "For salaried employees in Greece",
     title: "Plan your month, your goals and your first home",
-    lead: "Three tools that work on their own or together. Start with your monthly budget, add goals when you are ready, and plan a house purchase only if you want one. It takes a few minutes and needs no account.",
+    lead: "Four tools that work on their own or together. Start with your budget plan and tracker, add goals when you are ready, and plan a house purchase only if you want one. It takes a few minutes and needs no account.",
     ctaNew: "Start planning",
     ctaBack: "Open your roadmap",
     trust: ["No account and no sign-up", "Your data never leaves your browser", "Free to use"],
     heroAlt: "The Financial Overview page, showing savings, investments, the home and the loan year by year.",
     howTitle: "How it works",
-    stepsNote: "Use one, two or all three. Goals and the House Planner build on your monthly budget, and neither needs the other.",
+    stepsNote: "Use as many as you like. Goals and the House Planner build on your Budget Plan, and neither needs the other.",
     steps: [
-      { t: "Monthly Budget: start here", d: "Enter your net monthly salary and your usual expenses. See what is left over each month." },
+      { t: "Budget Plan: start here", d: "Enter your net monthly salary and what you expect to spend on each category. See what is left over each month." },
+      { t: "Monthly Tracker", d: "Log your real purchases and see, category by category, how each month compares with your plan." },
       { t: "Goals: optional", d: "A wedding, a car, a holiday. Each goal shows how it changes your free money, and your deposit date if you plan a house." },
       { t: "House Planner: optional", d: "Planning to buy? Enter a price or a loan. The planner sizes the deposit and the loan, then follows the investments until you are debt-free." },
     ],
@@ -33,9 +34,9 @@ export default {
     features: [
       {
         t: "A monthly budget you can trust",
-        d: "Planned against actual spending, a bonus share and the free money that remains. The plan never lets you spend more than you earn: it tells you which months are short and where to cut.",
+        d: "Baselines you set once, real purchases you log, a bonus share and the free money that remains. The plan never lets you spend more than you earn: it tells you which months are short and where to cut.",
         img: "budget",
-        alt: "The Monthly Budget page with salary, expense categories and free money.",
+        alt: "The Budget Plan page with salary, expense categories and free money.",
       },
       {
         t: "A house plan in three stages",
@@ -61,7 +62,7 @@ export default {
     privacyLink: "Read the privacy policy",
     faqTitle: "Questions",
     faq: [
-      { q: "Do I have to plan a house?", a: "No. The Monthly Budget and Goals work on their own, and the Financial Overview then shows your savings and goals. Add the House Planner only if you are buying a home." },
+      { q: "Do I have to plan a house?", a: "No. The Budget Plan and Goals work on their own, and the Financial Overview then shows your savings and goals. Add the House Planner only if you are buying a home." },
       { q: "Is it really free?", a: "Yes, you can use every page without paying or signing up." },
       { q: "Where is my data stored?", a: "Only in this browser on this device. If you clear your browser data you lose it, so use Export backup in the footer to keep a copy." },
       { q: "Does it calculate my taxes?", a: "No. You enter your net salary and it is used as given. The only tax figures are editable assumptions, for example tax on investment gains." },

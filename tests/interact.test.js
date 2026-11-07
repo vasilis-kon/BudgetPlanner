@@ -3,6 +3,8 @@ import * as store from "../js/store.js";
 import * as goals from "../js/pages/goals.js";
 import * as house from "../js/pages/house.js";
 import * as budget from "../js/pages/budget.js";
+import * as tracker from "../js/pages/tracker.js";
+import { setSelected } from "../js/components/selected-month.js";
 import * as overview from "../js/pages/overview.js";
 import { buildSample } from "./sample.js";
 import { addMonths } from "../js/calc/budget.js";
@@ -22,6 +24,7 @@ const $ = (sel) => stage.querySelector(sel);
 const $$ = (sel) => [...stage.querySelectorAll(sel)];
 
 function start(variant, page) {
+  setSelected(null); // every test opens on the current month
   localStorage.setItem(store.STORAGE_KEY, JSON.stringify(buildSample(variant)));
   store.load();
   stage.innerHTML = "";
@@ -153,7 +156,7 @@ test("budget: from the month the loan starts, rent is 0 and the installment and 
   commit($("#month-input"), purchase);
   is(!!$("#home-card"), "home card appears in the first month of the loan");
   eq($("#planned-rent").value, "0", "rent is 0");
-  is($("#planned-rent").disabled && $("#actual-rent").disabled, "rent fields are locked");
+  is($("#planned-rent").disabled, "rent field is locked");
   const card = $("#home-card").textContent;
   is(card.includes("Loan installment") && card.includes("€739.88") && card.includes("€120"), "installment and running costs listed: " + card);
   is($("#expenses-card").textContent.includes("Rent counts as €0"), "explains why rent is 0");
@@ -258,6 +261,7 @@ test("budget: the free money on screen matches the House Planner in every month 
   for (let i = 0; i < r.rows.length; i += 4) {
     const row = r.rows[i];
     if (row.key > addMonths(buildSample("full").settings.startMonth, 359)) break; // the month picker's range
+    if ((store.getState().months[row.key]?.items || []).length) continue; // real spending logged in a month is counted by the planner but not by the plan page
     commit($("#month-input"), row.key);
     const shown = money($("#free-card .stat-value"));
     if (Math.abs(shown - row.leftover) > 0.011) throw new Error(`${row.key}: budget page shows ${shown}, planner has ${row.leftover.toFixed(2)}`);
@@ -642,6 +646,89 @@ test("removing a category also removes cost steps and event costs that point at 
   const h = store.getState().house;
   is(!h.costSteps.some((x) => x.catId === "cx1"), "cost step removed");
   is(!("cx1" in h.events[0].costs), "event cost removed");
+});
+
+/* ---------- Monthly Tracker ---------- */
+const rowsOf = () => $$("tr[data-id]");
+const cmp = (id) => $$(".compare tbody tr").find((r) => r.textContent.includes(id));
+const firstMonth = () => Object.keys(store.getState().months)[0];
+test("tracker: add a purchase with a category, see its icon, and see it in the comparison", () => {
+  start("empty", tracker);
+  is($("#list-empty"), "an empty month says so");
+  eq(rowsOf().length, 0);
+  type($("#add-name"), "Tickets to London");
+  commit($("#add-cat"), "travel");
+  is($("#add-icon").innerHTML.includes("svg"), "the add row shows the category icon");
+  type($("#add-amount"), "180");
+  submit($("#add-form"));
+  const it = store.getState().months[firstMonth()].items[0];
+  eq(it.name, "Tickets to London"); eq(it.catId, "travel"); eq(it.amount, 180);
+  eq(rowsOf().length, 1, "one row");
+  is(rowsOf()[0].querySelector(".cat-icon").innerHTML === $("#add-icon").innerHTML, "the row's icon is the travel icon");
+  is(rowsOf()[0].querySelector(".js-cat").value === "travel", "the category is selected in the row");
+  eq($("#list-total").textContent, "€180");
+  const row = cmp("Travel");
+  is(row && row.textContent.includes("no baseline") && row.textContent.includes("€180") && row.textContent.includes("over baseline"), "travel is over a zero baseline: " + (row && row.textContent));
+  is($("#add-name").value === "" && $("#add-amount").value === "", "the add row is cleared and ready for the next purchase");
+  eq($("#add-cat").value, "travel", "the last category is remembered");
+});
+test("tracker: an amount is required; nothing is saved without one", () => {
+  start("empty", tracker);
+  type($("#add-name"), "Mystery");
+  submit($("#add-form"));
+  is($("#add-error").textContent.length > 0 && $("#add-amount").getAttribute("aria-invalid") === "true", "an error is shown on the amount");
+  eq(rowsOf().length, 0);
+});
+test("tracker: editing a row updates the totals, and the comparison reads the baselines from the Budget Plan", () => {
+  start("basic", tracker);
+  eq(rowsOf().length, 3, "sample purchases");
+  const groceries = rowsOf().find((r) => r.querySelector(".js-name").value === "Supermarket");
+  is(cmp("Groceries").textContent.includes("€300") && cmp("Groceries").textContent.includes("€62.40") && cmp("Groceries").textContent.includes("under baseline"), "groceries: 62.40 of a 300 baseline");
+  type(groceries.querySelector(".js-amount"), "340");
+  is(cmp("Groceries").textContent.includes("+€40") && cmp("Groceries").textContent.includes("over baseline"), "groceries now over by 40: " + cmp("Groceries").textContent);
+  eq($("#list-total").textContent, "€555", "340 + 35 + 180");
+  commit(groceries.querySelector(".js-cat"), "eating");
+  is(groceries.querySelector(".cat-icon").innerHTML.includes("svg"), "the icon follows the category");
+  is(cmp("Eating out").textContent.includes("€375"), "eating out now has 340 + 35");
+  eq(store.getState().months[firstMonth()].items.find((i) => i.name === "Supermarket").catId, "eating", "saved");
+});
+test("tracker: deleting a row takes it out of the saved data and the totals", () => {
+  start("basic", tracker);
+  rowsOf()[0].querySelector('[data-action="remove"]').click();
+  eq(rowsOf().length, 2);
+  eq(store.getState().months[firstMonth()].items.length, 2);
+});
+test("tracker: other months have their own list but the same baselines carry forward", () => {
+  start("basic", tracker);
+  commit($("#month-input"), plus(2));
+  eq(rowsOf().length, 0, "nothing logged two months on");
+  is($(".compare tbody").textContent.includes("€300"), "the groceries baseline carries forward");
+  eq($("#add-date").value, `${plus(2)}-01`, "the add row starts on the first of the month");
+  type($("#add-amount"), "25"); submit($("#add-form"));
+  eq(rowsOf().length, 1);
+  commit($("#month-input"), plus(0));
+  eq(rowsOf().length, 3, "back to the first month");
+});
+test("tracker: a date outside the month is refused", () => {
+  start("empty", tracker);
+  commit($("#add-date"), `${plus(3)}-10`);
+  type($("#add-amount"), "10"); submit($("#add-form"));
+  is($("#add-error").textContent.includes("inside"), "date error shown");
+  eq(rowsOf().length, 0);
+});
+test("tracker: dropping a category moves its logged purchases to Other", () => {
+  const st = buildSample("empty");
+  st.categories.push({ id: "cx1", name: "Pets", icon: "paw-print", builtin: false });
+  const k = Object.keys(st.months)[0];
+  st.months[k].items = [{ id: "p1", date: null, name: "Food", catId: "cx1", amount: 30 }];
+  localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load();
+  stage.innerHTML = ""; budget.render(stage);
+  $('[data-action="remove-cat"][data-id="cx1"]').click();
+  eq(store.getState().months[k].items[0].catId, "other", "kept, under Other");
+});
+test("tracker: without a plan it asks you to set up the Budget Plan first", () => {
+  store.eraseAll(); stage.innerHTML = ""; tracker.render(stage);
+  is(stage.textContent.includes("set up your Budget Plan first") && !!$('a[href="#/budget"]'), "prompt with a link");
 });
 
 const failed = results.filter((r) => !r.ok);

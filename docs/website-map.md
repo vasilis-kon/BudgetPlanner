@@ -65,7 +65,11 @@ The first page is a timeline of the user's plan from today to debt-free, with a 
 - Clicking a milestone opens the page it belongs to.
 - Short "who this is for" note for first-time visitors.
 
-## Page 1 — Monthly Budget
+## Page 1 — Budget Plan and Monthly Tracker
+
+The page is split in two. The **Budget Plan** holds the baselines; the **Monthly Tracker** (menu item right below it) holds what was really spent. A baseline applies to its month and every month after it until the user changes it in the Budget Plan or a life event in the House Planner overrides it. Logged purchases are stored per month as items (date, description, category, amount); a category's actual spending is the sum of its items. The tracker shows the list (category icon on the left of each row), then a table of baseline vs. spent vs. difference per category. In the projection, only a finished month counts what was really spent. The current month always uses the baselines, whatever has been logged so far; on the 1st of the next month its logged purchases replace them.
+
+### Budget Plan
 
 The starting point: what comes in, what goes out, and what is left each month.
 

@@ -2,6 +2,7 @@
 import * as store from "../js/store.js";
 import * as home from "../js/pages/home.js";
 import * as budget from "../js/pages/budget.js";
+import * as tracker from "../js/pages/tracker.js";
 import * as goals from "../js/pages/goals.js";
 import * as house from "../js/pages/house.js";
 import * as overview from "../js/pages/overview.js";
@@ -9,7 +10,7 @@ import * as landing from "../js/pages/landing.js";
 import * as info from "../js/pages/info.js";
 import { buildSample } from "./sample.js";
 
-const PAGES = { home, budget, goals, house, overview, welcome: landing, about: info.about, privacy: info.privacy, terms: info.terms, disclaimer: info.disclaimer };
+const PAGES = { home, budget, tracker, goals, house, overview, welcome: landing, about: info.about, privacy: info.privacy, terms: info.terms, disclaimer: info.disclaimer };
 const results = [];
 const stage = document.getElementById("stage");
 
@@ -72,7 +73,7 @@ for (const variant of ["empty", "goals", "basic", "full", "short"]) {
     }
     if (name === "welcome") {
       expect["welcome shows the right call to action"] = (o) => o.text.includes("Open your roadmap") && !o.text.includes("Start planning");
-      expect["welcome has a how-it-works list of 3 steps"] = (o) => o.root.querySelectorAll(".how li").length === 3;
+      expect["welcome has a how-it-works list of 4 steps"] = (o) => o.root.querySelectorAll(".how li").length === 4;
       expect["every screenshot has alt text, a size and a file"] = (o) => [...o.root.querySelectorAll("img.shot")].length === 4 && [...o.root.querySelectorAll("img.shot")].every((i) => i.alt.length > 20 && i.width && i.height && /assets\/screens\/\w+\.webp$/.test(i.getAttribute("src")));
       expect["welcome has FAQ and privacy link"] = (o) => o.root.querySelectorAll("details").length === 5 && !!o.root.querySelector('a[href="#/privacy"]');
     }
@@ -123,6 +124,13 @@ for (const variant of ["empty", "goals", "basic", "full", "short"]) {
       expect["overview shows net worth at 65"] = (o) => o.text.includes("Net worth at 65");
     }
     if (name === "budget" && variant === "full") expect["budget shows goal lines section"] = (o) => o.text.includes("Goals this month");
+    if (name === "budget") expect["the budget plan has baselines only: no actual or difference columns"] = (o) => !o.root.querySelector('[id^="actual-"]') && !o.text.includes("Difference");
+    if (name === "tracker" && variant !== "empty") {
+      expect["tracker lists the logged purchases, each with a category icon"] = (o) => [...o.root.querySelectorAll(".js-name")].some((i) => i.value === "Tickets to London") && o.root.querySelectorAll("tr[data-id]").length === 3 && [...o.root.querySelectorAll("tr[data-id] .cat-icon svg")].length === 3;
+      expect["tracker compares each category with its baseline"] = (o) => o.root.querySelectorAll(".compare tbody tr").length >= 6 && o.text.includes("How you did against your baselines");
+      expect["tracker shows travel with no baseline"] = (o) => o.text.includes("no baseline") && o.text.includes("Travel");
+    }
+    if (name === "tracker" && variant === "empty") expect["tracker with nothing logged says so"] = (o) => o.text.includes("No purchases logged for this month yet");
     check(name, variant, expect);
   }
 }

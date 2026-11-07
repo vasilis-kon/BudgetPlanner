@@ -88,18 +88,17 @@ export function prepare(inp) {
     let total = 0, rentAmt = 0;
     const each = [];
     for (const c of categoryIds) {
-      let amount;
-      const actual = key <= today ? actualFor(months, c, key) : null;
-      if (actual !== null) amount = actual;
-      else {
-        const p = plannedFor(months, c, key);
-        amount = p.amount;
-        let from = p.from;
-        for (const st of stepsByCat[c] || []) {
-          if (st.from <= key && (from === null || st.from >= from)) { amount = st.amount; from = st.from; }
-        }
-        for (const e of active) if (e.costs && e.costs[c] !== undefined) amount = e.costs[c];
+      const actual = key < today ? actualFor(months, c, key) : null;
+      const p = plannedFor(months, c, key);
+      let amount = p.amount;
+      let from = p.from;
+      for (const st of stepsByCat[c] || []) {
+        if (st.from <= key && (from === null || st.from >= from)) { amount = st.amount; from = st.from; }
       }
+      for (const e of active) if (e.costs && e.costs[c] !== undefined) amount = e.costs[c];
+      // Only a finished month counts what was really spent. The current month is not over, so it keeps using the
+      // baselines; on the 1st of the next month its logged purchases replace them.
+      if (actual !== null) amount = actual;
       total += amount;
       each.push(amount);
       if (c === RENT_CATEGORY) rentAmt = amount;
