@@ -35,6 +35,7 @@ const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matche
 
 /** Shared look for axes, legend and tooltips. `yFormat` formats the money axis. */
 export function baseOptions(theme, yFormat, extra = {}) {
+  if (window.Chart) window.Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
   return {
     responsive: true,
     maintainAspectRatio: false,

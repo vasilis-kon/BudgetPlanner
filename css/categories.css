@@ -1,0 +1,112 @@
+/* Category icons: each icon gets its own hue, tinted tile + saturated glyph (glyph vs tile is at least 3:1 in both themes). */
+:root {
+  --k-blue: #1d4ed8;
+  --k-teal: #0f766e;
+  --k-amber: #b45309;
+  --k-rose: #be123c;
+  --k-green: #15803d;
+  --k-orange: #c2410c;
+  --k-cyan: #0e7490;
+  --k-pink: #be185d;
+  --k-sky: #0369a1;
+  --k-lime: #4d7c0f;
+  --k-red: #b91c1c;
+  --k-slate: #475569;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --k-blue: #93c5fd;
+    --k-teal: #5eead4;
+    --k-amber: #fcd34d;
+    --k-rose: #fda4af;
+    --k-green: #86efac;
+    --k-orange: #fdba74;
+    --k-cyan: #67e8f9;
+    --k-pink: #f9a8d4;
+    --k-sky: #7dd3fc;
+    --k-lime: #bef264;
+    --k-red: #fca5a5;
+    --k-slate: #cbd5e1;
+  }
+}
+:root[data-theme="dark"] {
+  --k-blue: #93c5fd;
+  --k-teal: #5eead4;
+  --k-amber: #fcd34d;
+  --k-rose: #fda4af;
+  --k-green: #86efac;
+  --k-orange: #fdba74;
+  --k-cyan: #67e8f9;
+  --k-pink: #f9a8d4;
+  --k-sky: #7dd3fc;
+  --k-lime: #bef264;
+  --k-red: #fca5a5;
+  --k-slate: #cbd5e1;
+}
+
+.cat-icon:has(svg[data-i="house"]),
+.icon-picker label:has(svg[data-i="house"]),
+.cat-icon:has(svg[data-i="landmark"]),
+.icon-picker label:has(svg[data-i="landmark"]),
+.cat-icon:has(svg[data-i="graduation-cap"]),
+.icon-picker label:has(svg[data-i="graduation-cap"]) { --k: var(--k-blue); }
+.cat-icon:has(svg[data-i="shopping-basket"]),
+.icon-picker label:has(svg[data-i="shopping-basket"]),
+.cat-icon:has(svg[data-i="book-open"]),
+.icon-picker label:has(svg[data-i="book-open"]),
+.cat-icon:has(svg[data-i="shopping-bag"]),
+.icon-picker label:has(svg[data-i="shopping-bag"]) { --k: var(--k-green); }
+.cat-icon:has(svg[data-i="zap"]),
+.icon-picker label:has(svg[data-i="zap"]),
+.cat-icon:has(svg[data-i="fuel"]),
+.icon-picker label:has(svg[data-i="fuel"]),
+.cat-icon:has(svg[data-i="sparkles"]),
+.icon-picker label:has(svg[data-i="sparkles"]) { --k: var(--k-amber); }
+.cat-icon:has(svg[data-i="bus"]),
+.icon-picker label:has(svg[data-i="bus"]),
+.cat-icon:has(svg[data-i="smartphone"]),
+.icon-picker label:has(svg[data-i="smartphone"]) { --k: var(--k-sky); }
+.cat-icon:has(svg[data-i="heart-pulse"]),
+.icon-picker label:has(svg[data-i="heart-pulse"]),
+.cat-icon:has(svg[data-i="gift"]),
+.icon-picker label:has(svg[data-i="gift"]) { --k: var(--k-rose); }
+.cat-icon:has(svg[data-i="utensils"]),
+.icon-picker label:has(svg[data-i="utensils"]),
+.cat-icon:has(svg[data-i="paw-print"]),
+.icon-picker label:has(svg[data-i="paw-print"]),
+.cat-icon:has(svg[data-i="coffee"]),
+.icon-picker label:has(svg[data-i="coffee"]) { --k: var(--k-orange); }
+.cat-icon:has(svg[data-i="repeat"]),
+.icon-picker label:has(svg[data-i="repeat"]),
+.cat-icon:has(svg[data-i="wifi"]),
+.icon-picker label:has(svg[data-i="wifi"]),
+.cat-icon:has(svg[data-i="music"]),
+.icon-picker label:has(svg[data-i="music"]) { --k: var(--k-cyan); }
+.cat-icon:has(svg[data-i="ticket"]),
+.icon-picker label:has(svg[data-i="ticket"]),
+.cat-icon:has(svg[data-i="baby"]),
+.icon-picker label:has(svg[data-i="baby"]),
+.cat-icon:has(svg[data-i="piggy-bank"]),
+.icon-picker label:has(svg[data-i="piggy-bank"]) { --k: var(--k-pink); }
+.cat-icon:has(svg[data-i="plane"]),
+.icon-picker label:has(svg[data-i="plane"]),
+.cat-icon:has(svg[data-i="dumbbell"]),
+.icon-picker label:has(svg[data-i="dumbbell"]),
+.cat-icon:has(svg[data-i="target"]),
+.icon-picker label:has(svg[data-i="target"]) { --k: var(--k-teal); }
+.cat-icon:has(svg[data-i="shirt"]),
+.icon-picker label:has(svg[data-i="shirt"]) { --k: var(--k-lime); }
+.cat-icon:has(svg[data-i="car"]),
+.icon-picker label:has(svg[data-i="car"]),
+.cat-icon:has(svg[data-i="film"]),
+.icon-picker label:has(svg[data-i="film"]) { --k: var(--k-red); }
+.cat-icon:has(svg[data-i="circle-ellipsis"]),
+.icon-picker label:has(svg[data-i="circle-ellipsis"]),
+.cat-icon:has(svg[data-i="wrench"]),
+.icon-picker label:has(svg[data-i="wrench"]) { --k: var(--k-slate); }
+
+.cat-icon, .icon-picker label { --k: var(--primary-text); }
+.cat-icon { background: color-mix(in srgb, var(--k) 15%, var(--surface)); color: var(--k); border-radius: 10px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k) 28%, transparent); }
+.cat-icon .icon { stroke-width: 2.1; }
+.icon-picker label .icon { color: var(--k); }
+.icon-picker label:has(input:checked) { background: color-mix(in srgb, var(--k) 16%, var(--surface)); border-color: var(--k); outline-color: var(--k); }

@@ -9,12 +9,14 @@ body {
   font-family: var(--font);
   font-size: var(--text-base);
   line-height: var(--leading);
+  font-feature-settings: "ss01", "tnum" 0;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-h1, h2, h3 { line-height: 1.2; margin: 0 0 var(--space-3); font-weight: 750; letter-spacing: -0.01em; }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 var(--space-3); font-weight: 750; letter-spacing: -0.012em; }
 h1 { font-size: var(--text-2xl); }
 h2 { font-size: var(--text-xl); }
 h3 { font-size: var(--text-lg); }
@@ -31,7 +33,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 
 .muted { color: var(--text-muted); }
 .small { font-size: var(--text-sm); }
-.num { font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 
 .visually-hidden {
   position: absolute !important;

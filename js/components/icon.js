@@ -76,5 +76,5 @@ export const PICKABLE = ["car","plane","graduation-cap","baby","paw-print","gift
 export function icon(name, { size = 20, label = "" } = {}) {
   const body = PATHS[name] || PATHS["circle-ellipsis"];
   const a11y = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
-  return `<svg class="icon" ${a11y} width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+  return `<svg class="icon" data-i="${name in PATHS ? name : "circle-ellipsis"}" ${a11y} width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 }
