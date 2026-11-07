@@ -24,6 +24,7 @@
   --danger-text: #b01c1c;
   --danger-bg: #fde6e6;
   --focus: #3949ab;
+  --card-accent: var(--primary); /* the bar along the top of a card */
 
   /* Header band */
   --header-bg: #1a237e;
@@ -64,48 +65,50 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #0d1245;
-    --surface: #1a2468;
-    --surface-2: #26328f;
-    --border: #4a58b0;
-    --border-strong: #8c97d9;
-    --text: #eef0fb;
-    --text-muted: #c5cbea;
+    --surface: #2a3d92;
+    --surface-2: #3a50ab;
+    --border: #6d9bdd;
+    --border-strong: #90caf9;
+    --text: #f5fbff;
+    --text-muted: #d3e8fb;
     --primary: #4153bd;
     --primary-hover: #5c6bc0;
     --on-primary: #ffffff;
-    --primary-text: #b3bbea;
-    --primary-soft: #2d3a9a;
+    --primary-text: #e1f5fe;
+    --primary-soft: #3f55b3;
     --positive-text: #5eead4;
     --positive-bg: #14473f;
     --warn-text: #fcd34d;
     --warn-bg: #4a3812;
     --danger-text: #fca5a5;
     --danger-bg: #52202a;
-    --focus: #9fa8da;
+    --focus: #90caf9;
+    --card-accent: #90caf9;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #0d1245;
-  --surface: #1a2468;
-  --surface-2: #26328f;
-  --border: #4a58b0;
-  --border-strong: #8c97d9;
-  --text: #eef0fb;
-  --text-muted: #c5cbea;
+  --surface: #2a3d92;
+  --surface-2: #3a50ab;
+  --border: #6d9bdd;
+  --border-strong: #90caf9;
+  --text: #f5fbff;
+  --text-muted: #d3e8fb;
   --primary: #4153bd;
   --primary-hover: #5c6bc0;
   --on-primary: #ffffff;
-  --primary-text: #b3bbea;
-  --primary-soft: #2d3a9a;
+  --primary-text: #e1f5fe;
+  --primary-soft: #3f55b3;
   --positive-text: #5eead4;
   --positive-bg: #14473f;
   --warn-text: #fcd34d;
   --warn-bg: #4a3812;
   --danger-text: #fca5a5;
   --danger-bg: #52202a;
-  --focus: #9fa8da;
+  --focus: #90caf9;
+  --card-accent: #90caf9;
 }
 
 /* Chart and data colours. Each is at least 3:1 against the card surface, and charts also use
