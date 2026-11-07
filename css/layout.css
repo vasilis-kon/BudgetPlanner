@@ -96,3 +96,13 @@ main {
 
 .site-header .btn-quiet { color: var(--header-text); }
 .site-header .btn-quiet:hover { background: var(--header-hover); }
+
+/* Theme switch: always top right, on every page. On wide screens it floats above the content. */
+@media (min-width: 64rem) {
+  .site-header #theme-toggle {
+    position: fixed; top: var(--space-3); right: var(--space-5); z-index: 30;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
+  }
+  .site-header #theme-toggle:hover { background: var(--surface-2); }
+  main { padding-top: 4rem; }
+}
