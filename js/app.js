@@ -7,6 +7,8 @@ import * as budget from "./pages/budget.js";
 import * as goals from "./pages/goals.js";
 import * as house from "./pages/house.js";
 import * as overview from "./pages/overview.js";
+import * as landing from "./pages/landing.js";
+import * as info from "./pages/info.js";
 
 const ROUTES = {
   home: { page: home, icon: "map-pinned" },
@@ -14,6 +16,12 @@ const ROUTES = {
   goals: { page: goals, icon: "target" },
   house: { page: house, icon: "house" },
   overview: { page: overview, icon: "chart-line" },
+  // Pages outside the main menu: reached from the footer, the welcome page and links in the text.
+  welcome: { page: landing, nav: false },
+  about: { page: info.about, nav: false },
+  privacy: { page: info.privacy, nav: false },
+  terms: { page: info.terms, nav: false },
+  disclaimer: { page: info.disclaimer, nav: false },
 };
 const DEFAULT_ROUTE = "home";
 
@@ -27,6 +35,7 @@ function currentRoute() {
 
 function renderHeader() {
   const nav = Object.entries(ROUTES)
+    .filter(([, r]) => r.nav !== false)
     .map(([name, r]) => `<li><a href="#/${name}" data-route="${name}">${icon(r.icon)}<span>${t("nav." + name)}</span></a></li>`)
     .join("");
   $("site-header").innerHTML = `
@@ -105,6 +114,9 @@ function renderFooter() {
   $("site-footer").innerHTML = `
     <div class="footer-inner">
       <p class="small muted">${t("footer.saved")}</p>
+      <nav class="footer-links small" aria-label="${t("footerLinks.label")}"><ul>
+        ${["welcome", "about", "privacy", "terms", "disclaimer"].map((n) => `<li><a href="#/${n}" data-route="${n}">${t("nav." + n)}</a></li>`).join("")}
+      </ul></nav>
       <div class="row">
         <button type="button" class="btn btn-small" id="export-btn">${icon("download", { size: 16 })}${t("footer.export")}</button>
         <button type="button" class="btn btn-small" id="import-btn">${icon("upload", { size: 16 })}${t("footer.import")}</button>
@@ -167,8 +179,16 @@ function start() {
   renderFooter();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { updateThemeButton(); window.dispatchEvent(new Event("bp-theme")); });
   store.subscribe(updateBanner);
+  // After "Erase all saved data": go back to the default look and menu state.
+  window.addEventListener("bp-erased", () => {
+    document.documentElement.classList.remove("nav-collapsed");
+    applyTheme();
+    updateThemeButton();
+    syncToggle();
+  });
   window.addEventListener("hashchange", onHashChange);
-  if (!location.hash) history.replaceState(null, "", "#/" + DEFAULT_ROUTE);
+  // First-time visitors (no plan yet) get the welcome page; everyone else lands on their roadmap.
+  if (!location.hash) history.replaceState(null, "", "#/" + (store.getState().settings.startMonth ? DEFAULT_ROUTE : "welcome"));
   render();
 }
 

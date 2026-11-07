@@ -1,0 +1,72 @@
+/* Welcome page and plain information pages (About, Privacy, Terms, Disclaimer), plus footer links. */
+
+/* Footer links */
+.footer-links ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+.footer-links a { display: inline-flex; align-items: center; min-height: var(--tap); }
+
+/* Text pages */
+.prose { max-width: 46rem; }
+.prose-sec { margin-bottom: var(--space-5); }
+.prose h2 { font-size: var(--text-lg); margin: 0 0 var(--space-2); }
+.prose ul { padding-left: 1.25rem; margin: 0 0 var(--space-3); }
+.prose li + li { margin-top: var(--space-1); }
+.prose .card { margin-top: var(--space-5); }
+.lead-text { font-size: var(--text-lg); font-weight: 500; }
+.meta { color: var(--text-muted); font-size: var(--text-sm); margin: 0; }
+.assumptions th[scope="row"] { font-weight: 500; white-space: normal; }
+.assumptions td { white-space: normal; font-weight: 600; }
+.contact-list { list-style: none; padding: 0; }
+.contact-list li { display: flex; align-items: center; gap: var(--space-2); min-height: var(--tap); }
+.contact-list .icon { color: var(--primary-text); flex: none; }
+textarea {
+  font: inherit; color: var(--text); background: var(--surface); width: 100%; resize: vertical;
+  padding: var(--space-3); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+}
+textarea[aria-invalid="true"] { border-color: var(--danger-text); }
+.erase .btn { margin-bottom: var(--space-2); }
+.notice { margin-top: var(--space-3); max-width: 46rem; }
+
+/* Welcome page */
+.btn-lg { min-height: 3.25rem; padding: 0 var(--space-5); font-size: var(--text-lg); }
+.welcome h2 { font-size: var(--text-xl); }
+.hero {
+  display: grid; gap: var(--space-5); align-items: center;
+  background: var(--header-bg); color: var(--header-text);
+  border-radius: var(--radius); border-bottom: 3px solid var(--primary);
+  padding: var(--space-5);
+}
+.hero h1 { font-size: var(--text-3xl); line-height: 1.1; margin-bottom: var(--space-3); }
+.hero .eyebrow { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #9db9ff; }
+.hero .lead { font-size: var(--text-lg); color: #d6e0fa; max-width: 36rem; }
+.hero .btn-primary { background: #ffffff; color: #0b1b4d; border-color: #ffffff; }
+.hero .btn-primary:hover { background: #dfe8fd; }
+.trust { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); color: #d6e0fa; }
+.trust li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.trust .icon { color: #9db9ff; }
+.shot { display: block; width: 100%; height: auto; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); }
+.how { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
+.how .card { position: relative; }
+.how-n {
+  display: inline-grid; place-items: center; width: 2rem; height: 2rem; margin-bottom: var(--space-2);
+  background: var(--primary); color: var(--on-primary); font-weight: 750; border-radius: var(--radius-sm);
+}
+.how h3 { font-size: var(--text-lg); }
+.how p { margin: 0; color: var(--text-muted); }
+.feature { display: grid; gap: var(--space-4); align-items: center; }
+.feature h3 { font-size: var(--text-xl); }
+.feature p { color: var(--text-muted); margin: 0; }
+.privacy-band { background: var(--primary-soft); border-top-color: var(--primary); }
+.faq details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.faq details + details { margin-top: var(--space-2); }
+.faq summary { cursor: pointer; font-weight: 650; padding: var(--space-3) var(--space-4); min-height: var(--tap); display: flex; align-items: center; }
+.faq details[open] summary { border-bottom: 1px solid var(--border); }
+.faq p { margin: 0; padding: var(--space-3) var(--space-4); color: var(--text-muted); }
+.final-cta { text-align: center; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--primary); border-radius: var(--radius); padding: var(--space-6) var(--space-4); }
+.final-cta h2 { margin-bottom: var(--space-4); }
+
+@media (min-width: 56rem) {
+  .hero { grid-template-columns: 1fr 1.15fr; padding: var(--space-6); }
+  .feature { grid-template-columns: 1fr 1.2fr; gap: var(--space-6); }
+  .feature:nth-child(even) .feature-media { order: -1; }
+  .feature:nth-child(even) { grid-template-columns: 1.2fr 1fr; }
+}

@@ -248,6 +248,16 @@ export function importJson(text) {
   return true;
 }
 
+/** Removes everything this site saved in the browser and starts from an empty plan. */
+export function eraseAll() {
+  state = emptyState();
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem("bp-nav-collapsed");
+  } catch (e) {}
+  listeners.forEach((l) => l(state));
+}
+
 export function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }

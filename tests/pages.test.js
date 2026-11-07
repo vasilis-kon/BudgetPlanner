@@ -5,9 +5,11 @@ import * as budget from "../js/pages/budget.js";
 import * as goals from "../js/pages/goals.js";
 import * as house from "../js/pages/house.js";
 import * as overview from "../js/pages/overview.js";
+import * as landing from "../js/pages/landing.js";
+import * as info from "../js/pages/info.js";
 import { buildSample } from "./sample.js";
 
-const PAGES = { home, budget, goals, house, overview };
+const PAGES = { home, budget, goals, house, overview, welcome: landing, about: info.about, privacy: info.privacy, terms: info.terms, disclaimer: info.disclaimer };
 const results = [];
 const stage = document.getElementById("stage");
 
@@ -32,7 +34,7 @@ function check(name, variant, expectations) {
     const out = drawPage(name);
     if (!out.root.querySelector("h1")) throw new Error("no <h1>");
     if (/\{\w+\}/.test(out.text)) throw new Error("an unfilled {placeholder} is showing: " + out.text.match(/.{20}\{\w+\}.{20}/)?.[0]);
-    if (/\b(?:home|goals|house|overview|budget)\.[a-z]+\.[A-Za-z.]+/.test(out.text)) throw new Error("a missing text key is showing: " + out.text.match(/\b(?:home|goals|house|overview|budget)\.[a-z]+\.[A-Za-z.]+/)[0]);
+    if (/\b(?:home|goals|house|overview|budget|welcome|about|privacy|terms|disclaimer|notice|info)\.[a-z]+\.[A-Za-z.]+/.test(out.text)) throw new Error("a missing text key is showing: " + out.text.match(/\b(?:home|goals|house|overview|budget|welcome|about|privacy|terms|disclaimer|notice|info)\.[a-z]+\.[A-Za-z.]+/)[0]);
     if (/NaN|undefined|Infinity/.test(out.text)) throw new Error("NaN/undefined/Infinity is showing: " + out.text.match(/.{25}(?:NaN|undefined|Infinity).{25}/)?.[0]);
     for (const [what, fn] of Object.entries(expectations || {})) if (!fn(out)) throw new Error("expected: " + what);
     results.push({ name: label, ok: true });
@@ -67,6 +69,34 @@ for (const variant of ["empty", "basic", "full", "short"]) {
     }
     if ((variant === "full" || variant === "basic") && ["house", "overview", "home"].includes(name)) {
       expect["a plan that covers its costs shows no red box"] = (o) => !o.root.querySelector(".card-danger");
+    }
+    if (name === "welcome") {
+      expect["welcome shows the right call to action"] = (o) => o.text.includes("Open your roadmap") && !o.text.includes("Start planning");
+      expect["welcome has a how-it-works list of 3 steps"] = (o) => o.root.querySelectorAll(".how li").length === 3;
+      expect["every screenshot has alt text, a size and a file"] = (o) => [...o.root.querySelectorAll("img.shot")].length === 4 && [...o.root.querySelectorAll("img.shot")].every((i) => i.alt.length > 20 && i.width && i.height && /assets\/screens\/\w+\.webp$/.test(i.getAttribute("src")));
+      expect["welcome has FAQ and privacy link"] = (o) => o.root.querySelectorAll("details").length === 4 && !!o.root.querySelector('a[href="#/privacy"]');
+    }
+    if (name === "privacy") {
+      expect["privacy says nothing leaves the device"] = (o) => o.text.includes("never sent to us") && o.text.includes("no analytics");
+      expect["privacy names what is stored"] = (o) => o.text.includes("budgetplanner:v1") && o.text.includes("bp-nav-collapsed");
+      expect["privacy has the erase button"] = (o) => !!o.root.querySelector("#erase-btn");
+    }
+    if (name === "terms") expect["terms cover warranty and liability"] = (o) => o.text.includes("No warranty") && o.text.includes("Limit of liability");
+    if (name === "disclaimer") {
+      expect["disclaimer says not financial advice"] = (o) => o.text.includes("Not financial advice") && o.text.includes("does not calculate your taxes");
+      expect["disclaimer shows the review date"] = (o) => o.text.includes("last reviewed on 7 November 2026");
+      expect["disclaimer table lists every default and matches the planner"] = (o) => o.root.querySelectorAll(".assumptions tbody tr").length === 13 && o.text.includes("4.2%") && o.text.includes("3.5% for 5 years, then 4.5%");
+    }
+    if (name === "about") {
+      expect["about names the owner and links GitHub"] = (o) => o.text.includes("Vasileios Konstas") && !!o.root.querySelector('a[href*="github.com"]');
+      expect["feedback form needs a message"] = (o) => {
+        const f = o.root.querySelector("#fb-form");
+        f.dispatchEvent(new Event("submit", { cancelable: true }));
+        return o.root.querySelector("#fb-err").textContent.length > 0;
+      };
+    }
+    if ((variant === "full" || variant === "basic") && ["house", "overview", "home"].includes(name)) {
+      expect["page carries the not-advice notice with a date"] = (o) => !!o.root.querySelector(".notice") && o.text.includes("not financial advice") && o.text.includes("7 November 2026");
     }
     if (name === "home" && variant === "empty") expect["who this is for note shows"] = (o) => o.text.includes("Who this is for");
     if (name === "goals" && variant === "full") {
@@ -147,6 +177,20 @@ try {
   clean2();
 } catch (e) {
   results.push({ name: "charts draw with the expected data", ok: false, msg: e.message || String(e) });
+}
+
+// A first-time visitor (nothing saved yet) is invited to start; erasing everything gets back to that state.
+try {
+  load("full");
+  store.eraseAll();
+  if (store.getState().settings.startMonth) throw new Error("eraseAll should clear the plan");
+  if (localStorage.getItem(store.STORAGE_KEY)) throw new Error("eraseAll should remove the saved data");
+  stage.innerHTML = "";
+  landing.render(stage);
+  if (!stage.textContent.includes("Start planning") || stage.textContent.includes("Open your roadmap")) throw new Error("a new visitor should see Start planning");
+  results.push({ name: "welcome page: first-time visitor sees Start planning after erasing saved data", ok: true });
+} catch (e) {
+  results.push({ name: "welcome page: first-time visitor sees Start planning after erasing saved data", ok: false, msg: e.message || String(e) });
 }
 
 const failed = results.filter((r) => !r.ok);

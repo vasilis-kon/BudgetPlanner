@@ -4,7 +4,7 @@ import { buildSample } from "./sample.js";
 
 const AXE = "https://cdn.jsdelivr.net/npm/axe-core@4.10.2/axe.min.js";
 const q = new URLSearchParams(location.search);
-const ROUTES = q.get("route") ? [q.get("route")] : ["home", "budget", "goals", "house", "overview"];
+const ROUTES = q.get("route") ? [q.get("route")] : ["home", "budget", "goals", "house", "overview", "welcome", "about", "privacy", "terms", "disclaimer"];
 const VARIANT = q.get("variant") || "full";
 const THEMES = q.get("theme") ? [q.get("theme")] : ["light", "dark"];
 const WIDTHS = q.get("w") ? [Number(q.get("w"))] : [1200, 390];

@@ -34,3 +34,10 @@ export function formatMonthShort(key) {
   const [y, m] = key.split("-").map(Number);
   return monthShortFmt.format(new Date(Date.UTC(y, m - 1, 1)));
 }
+
+const dayFmt = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+/** "2026-11-07" becomes "7 November 2026". */
+export function formatDay(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return dayFmt.format(new Date(Date.UTC(y, m - 1, d)));
+}

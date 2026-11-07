@@ -1,4 +1,5 @@
 // Page 4: Overview. Where the user's money sits at the end of each year, from the first salary to debt-free.
+import { noticeHtml } from "../components/notice.js";
 import { t, formatWhole as eur, formatCompact, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
 import { currentMonth, duration } from "../components/format.js";
@@ -13,7 +14,7 @@ export function render(root) {
   root.appendChild(wrap);
   let unmount = [];
 
-  const head = `<div class="page-head"><h1>${t("overview.title")}</h1><p>${t("overview.intro")}</p></div>`;
+  const head = `<div class="page-head"><h1>${t("overview.title")}</h1><p>${t("overview.intro")}</p>${noticeHtml()}</div>`;
   const prompt = (text, href, cta) => `${head}<section class="card soon-card"><p>${text}</p><a class="btn btn-primary" href="${href}">${cta}${icon("chevron-right")}</a></section>`;
 
   function draw() {

@@ -1,6 +1,8 @@
 // All interface text lives here. A Greek file (el.js) with the same keys can be added later.
 // {name} placeholders are filled in by t() in index.js.
-export default {
+import site from "./en-site.js";
+
+const base = {
   app: { name: "BudgetPlanner", skip: "Skip to main content", loading: "Loading…" },
   nav: {
     label: "Main",
@@ -634,3 +636,6 @@ export default {
   yes: "Yes",
   cancel: "Cancel",
 };
+
+// The site pages add keys to `nav`, so that one object is merged by hand.
+export default { ...base, ...site, nav: { ...base.nav, ...site.nav } };

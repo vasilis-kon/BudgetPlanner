@@ -1,5 +1,6 @@
 // Page 0: Home. The roadmap: goals, life events, deposit, purchase and debt-free on one timeline,
 // with a "you are here" marker. Each milestone links to the page it belongs to.
+import { noticeHtml } from "../components/notice.js";
 import { t, formatMoney as eur, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
 import { esc } from "../components/dom.js";
@@ -109,7 +110,7 @@ export function render(root) {
   if (!inp.goals.length) hints.push(`<div class="note">${icon("info", { size: 18 })}<p>${t("home.hintGoals")} <a href="#/goals">${t("home.hintGoalsLink")}</a></p></div>`);
 
   root.innerHTML = `
-    <div class="page-head"><h1>${t("home.title")}</h1><p>${t("home.intro")}</p></div>
+    <div class="page-head"><h1>${t("home.title")}</h1><p>${t("home.intro")}</p>${noticeHtml()}</div>
     <div class="stack-lg">
       ${overspendHtml({ inp, prep, r, categories: s.categories })}
       <section class="card" aria-labelledby="road-h">

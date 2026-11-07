@@ -1,5 +1,6 @@
 // Page 3: House Planner. Your expected future, then Stage A (save the deposit), Stage B (size the loan)
 // and Stage C (invest and become debt-free). Every number comes from the user; the site adds none.
+import { noticeHtml } from "../components/notice.js";
 import { t, formatMoney as eurc, formatWhole as eur, formatCompact, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
 import { esc, parseAmount } from "../components/dom.js";
@@ -499,7 +500,7 @@ export function render(root) {
 
   function pageHtml() {
     const s = st();
-    const head = `<div class="page-head"><h1>${t("house.title")}</h1><p>${t("house.intro")}</p></div>`;
+    const head = `<div class="page-head"><h1>${t("house.title")}</h1><p>${t("house.intro")}</p>${noticeHtml()}</div>`;
     if (!s.settings.startMonth) {
       return `${head}<section class="card soon-card"><p>${t("house.needBudget")}</p><a class="btn btn-primary" href="#/budget">${t("house.needBudgetCta")}${icon("chevron-right")}</a></section>`;
     }
