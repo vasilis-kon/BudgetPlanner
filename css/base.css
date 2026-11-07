@@ -49,3 +49,10 @@ h1[tabindex="-1"]:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Smooth colour changes: switching between light and dark, and hover states, fade instead of snapping. */
+@media (prefers-reduced-motion: no-preference) {
+  body, .card, .btn, input, select, textarea, .stat, .note, .cat-icon, .badge, .main-nav a, .site-header, .site-footer, .shot, progress {
+    transition: background-color 280ms ease, color 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+  }
+}

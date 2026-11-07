@@ -1,34 +1,36 @@
-/* Design tokens: crisp, high-contrast, blue-led. Light by default, dark via OS setting or the toggle. */
+/* Design tokens: crisp, high-contrast, indigo-to-blue. Light by default, dark via OS setting or the toggle. */
 :root {
   color-scheme: light;
 
   /* Colour: surfaces and text */
-  --bg: #f1f4f9;
+  --bg: #f3f5fc;
   --surface: #ffffff;
-  --surface-2: #e7ecf5;
-  --border: #c9d2e3;
-  --border-strong: #76829c;
-  --text: #0a1226;
-  --text-muted: #44506b;
+  --surface-2: #e8eaf6;
+  --border: #c5cae9;
+  --border-strong: #5c6bc0;
+  --text: #0e1442;
+  --text-muted: #3b4482;
 
   /* Colour: brand and status (each text/background pair is at least 4.5:1) */
-  --primary: #1d4ed8;
-  --primary-hover: #1639b0;
+  --primary: #3949ab;
+  --primary-hover: #283593;
   --on-primary: #ffffff;
-  --primary-text: #1741c4;
-  --primary-soft: #dfe8fd;
+  --primary-text: #283593;
+  --primary-soft: #e8eaf6;
   --positive-text: #0b6b62;
   --positive-bg: #e0f2ef;
   --warn-text: #8a3b0c;
   --warn-bg: #fdf0d3;
   --danger-text: #b01c1c;
   --danger-bg: #fde6e6;
-  --focus: #1d4ed8;
+  --focus: #3949ab;
 
   /* Header band */
-  --header-bg: #0b1b4d;
+  --header-bg: #1a237e;
+  --header-bg-2: #0d47a1; /* the far end of the header gradient */
+  --header-grad: linear-gradient(160deg, #1a237e 0%, #0d47a1 100%);
   --header-text: #ffffff;
-  --header-hover: #1b2f6e;
+  --header-hover: #283593;
 
   /* Type */
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
@@ -61,49 +63,49 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0e1a35;
-    --surface: #1b3058;
-    --surface-2: #264273;
-    --border: #46659f;
-    --border-strong: #7f9acb;
-    --text: #f1f5fd;
-    --text-muted: #c0cce4;
-    --primary: #3468e6;
-    --primary-hover: #4a7df0;
+    --bg: #0d1245;
+    --surface: #1a2468;
+    --surface-2: #26328f;
+    --border: #4a58b0;
+    --border-strong: #8c97d9;
+    --text: #eef0fb;
+    --text-muted: #c5cbea;
+    --primary: #4153bd;
+    --primary-hover: #5c6bc0;
     --on-primary: #ffffff;
-    --primary-text: #a9c2ff;
-    --primary-soft: #2a4885;
+    --primary-text: #b3bbea;
+    --primary-soft: #2d3a9a;
     --positive-text: #5eead4;
     --positive-bg: #14473f;
     --warn-text: #fcd34d;
     --warn-bg: #4a3812;
     --danger-text: #fca5a5;
     --danger-bg: #52202a;
-    --focus: #9bb9ff;
+    --focus: #9fa8da;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0e1a35;
-  --surface: #1b3058;
-  --surface-2: #264273;
-  --border: #46659f;
-  --border-strong: #7f9acb;
-  --text: #f1f5fd;
-  --text-muted: #c0cce4;
-  --primary: #3468e6;
-  --primary-hover: #4a7df0;
+  --bg: #0d1245;
+  --surface: #1a2468;
+  --surface-2: #26328f;
+  --border: #4a58b0;
+  --border-strong: #8c97d9;
+  --text: #eef0fb;
+  --text-muted: #c5cbea;
+  --primary: #4153bd;
+  --primary-hover: #5c6bc0;
   --on-primary: #ffffff;
-  --primary-text: #a9c2ff;
-  --primary-soft: #2a4885;
+  --primary-text: #b3bbea;
+  --primary-soft: #2d3a9a;
   --positive-text: #5eead4;
   --positive-bg: #14473f;
   --warn-text: #fcd34d;
   --warn-bg: #4a3812;
   --danger-text: #fca5a5;
   --danger-bg: #52202a;
-  --focus: #9bb9ff;
+  --focus: #9fa8da;
 }
 
 /* Chart and data colours. Each is at least 3:1 against the card surface, and charts also use
@@ -113,19 +115,19 @@
   --c-goals: #b45309;
   --c-installment: #6d28d9;
   --c-invest: #0b6b62;
-  --c-bank: #1d4ed8;
+  --c-bank: #3949ab;
   --c-bonus: #be185d;
   --c-loan: #b01c1c;
-  --c-buffer: #0369a1;
+  --c-buffer: #0d47a1;
   --c-fund: #a16207;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --c-living: #94a3b8; --c-goals: #fbbf24; --c-installment: #a78bfa; --c-invest: #5eead4;
-    --c-bank: #7aa2ff; --c-bonus: #f472b6; --c-loan: #fca5a5; --c-buffer: #38bdf8; --c-fund: #facc15;
+    --c-bank: #9fa8da; --c-bonus: #f472b6; --c-loan: #fca5a5; --c-buffer: #64b5f6; --c-fund: #facc15;
   }
 }
 :root[data-theme="dark"] {
   --c-living: #94a3b8; --c-goals: #fbbf24; --c-installment: #a78bfa; --c-invest: #5eead4;
-  --c-bank: #7aa2ff; --c-bonus: #f472b6; --c-loan: #fca5a5; --c-buffer: #38bdf8; --c-fund: #facc15;
+  --c-bank: #9fa8da; --c-bonus: #f472b6; --c-loan: #fca5a5; --c-buffer: #64b5f6; --c-fund: #facc15;
 }

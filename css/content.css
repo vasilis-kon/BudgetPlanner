@@ -31,18 +31,18 @@ textarea[aria-invalid="true"] { border-color: var(--danger-text); }
 .welcome h2 { font-size: var(--text-xl); }
 .hero {
   display: grid; gap: var(--space-5); align-items: center;
-  background: var(--header-bg); color: var(--header-text);
-  border-radius: var(--radius); border-bottom: 3px solid var(--primary);
+  background: var(--header-bg); background-image: linear-gradient(135deg, var(--header-bg), var(--header-bg-2)); color: var(--header-text);
+  border-radius: var(--radius); border-bottom: 3px solid var(--border-strong);
   padding: var(--space-5);
 }
 .hero h1 { font-size: var(--text-3xl); line-height: 1.1; margin-bottom: var(--space-3); }
-.hero .eyebrow { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #9db9ff; }
-.hero .lead { font-size: var(--text-lg); color: #d6e0fa; max-width: 36rem; }
-.hero .btn-primary { background: #ffffff; color: #0b1b4d; border-color: #ffffff; }
-.hero .btn-primary:hover { background: #dfe8fd; }
-.trust { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); color: #d6e0fa; }
+.hero .eyebrow { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #bbdefb; }
+.hero .lead { font-size: var(--text-lg); color: #e1f5fe; max-width: 36rem; }
+.hero .btn-primary { background: #ffffff; color: #1a237e; border-color: #ffffff; }
+.hero .btn-primary:hover { background: #e8eaf6; }
+.trust { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); color: #e1f5fe; }
 .trust li { display: inline-flex; align-items: center; gap: var(--space-2); }
-.trust .icon { color: #9db9ff; }
+.trust .icon { color: #90caf9; }
 .shot { display: block; width: 100%; height: auto; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); }
 .how { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
 .how .card { position: relative; }
