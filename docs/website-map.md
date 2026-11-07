@@ -21,6 +21,8 @@ BudgetPlanner helps salaried employees in Greece plan their monthly budget, save
 | Inflation | No automatic inflation on the budget, goals or installment. Inflation shows up through what users actually spend, which they log in the Monthly Budget. |
 | Salary | Salary never rises automatically. It changes only when the user sets a new amount from a given month; earlier months keep the old amount. |
 | Monthly Budget and House Planner | One plan. The Monthly Budget shows, for any month, the same salary (with expected raises and life events), planned amounts (with cost steps and life events) and free money that the House Planner uses, so the two cannot disagree. Cells set by a life event, or by a cost step starting that month, are locked and say where they come from. |
+| Monthly investing | The Budget Plan has a "Share of free money invested" (percent, default 0). Each month from the current month on, that share of free money (what is left after expenses, goals and, once bought, the installment) goes into the ETF portfolio and the rest stays in the bank, so expenses + goals + installment + investing can never exceed the salary. Return, fee and tax on gains are shared with the House Planner. Without a house the Financial Overview shows savings, investments after tax and goal money, and the net worth line. |
+| House Planner switch | The House Planner is optional and starts switched off. Off: no house exists anywhere in the plan (even if a price is saved) and only budget, goals, expected future and monthly investing count. On: the house price (or loan amount) is mandatory; blank or zero is flagged and gives no dates. While on, all free money goes to the deposit from the current month until the deposit is ready (the monthly investing amount is not used then); after the purchase the House Planner's own share of free money is invested. Older saves with a price count as switched on. |
 | Rent | From the month the first loan installment is paid, the rent in the Monthly Budget counts as €0 (its fields are locked and say why). The loan installment and the home running costs appear as a "home" card and are taken off free money instead, so the Monthly Budget and the House Planner always agree. |
 | Monthly obligations | The budget, goals and loan installment are covered by the 12 regular salaries only, as banks assume. |
 | Bonus salaries | In the Christmas, Easter and summer bonus months, the user sets the share of the bonus that is saved. Before the house is bought it goes to the deposit (shown as the first priority); after, it goes to investments. The rest is assumed spent on gifts and holidays. |
@@ -193,3 +195,9 @@ BudgetPlanner/
 ├── docs/         website-map.md (this file)
 └── legacy/       the first prototype (greece-house-plan.html, clear-saved-inputs.html)
 ```
+
+## Interface notes
+
+- Dates: months are chosen with two dropdowns (month name, year); full dates (Monthly Tracker purchases) with three, in the Greek order day, month, year. The dropdowns only offer dates between the field's minimum and maximum. No browser date or month box is used.
+- Financial Overview columns: Deposit savings (the pot before buying), Bank savings (every euro of free money not invested, including the emergency buffer, which is only a safety amount set aside when the deposit is ready and is not shown separately), Goal funds, Investments after tax, Home at purchase price. The loan is a dashed line, not a column: it is what is still owed, and net worth is the columns minus that loan.
+- Sidebar: when collapsed to the icon rail, pointing at it (or tabbing into it) opens it over the page so the labels can be read and clicked; the content does not move.

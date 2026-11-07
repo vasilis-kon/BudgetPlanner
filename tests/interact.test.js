@@ -453,7 +453,7 @@ test("house: Add salary step opens the fields; saving closes them and leaves the
   openForm("salary");
   is(!!$("#ss-from") && !!$("#ss-amount"), "fields open");
   is(!$(addSel("salary")), "the button is replaced by the open form");
-  eq(document.activeElement.id, "ss-from", "focus goes to the first field");
+  eq(document.activeElement.closest("bp-date").id, "ss-from", "focus goes to the first field");
   const form = $("#salary-step-form");
   is(!!form.querySelector('button[type="submit"]'), "the form has a submit button, so Enter in a field saves it");
   commit($("#ss-from"), plus(24));
@@ -709,12 +709,32 @@ test("tracker: other months have their own list but the same baselines carry for
   commit($("#month-input"), plus(0));
   eq(rowsOf().length, 3, "back to the first month");
 });
-test("tracker: a date outside the month is refused", () => {
+test("tracker: the date dropdowns only offer days inside the month, so a date outside it is pulled back in", () => {
   start("empty", tracker);
-  commit($("#add-date"), `${plus(3)}-10`);
+  const d = $("#add-date");
+  is(d.querySelector(".bp-y").options.length === 2 && d.querySelector(".bp-m").options.length === 2, "one year and one month to choose (plus the empty entry)");
+  commit(d, `${plus(3)}-10`);
+  is(d.value.startsWith(plus(0)), "an outside date is pulled into the month: " + d.value);
   type($("#add-amount"), "10"); submit($("#add-form"));
-  is($("#add-error").textContent.includes("inside"), "date error shown");
-  eq(rowsOf().length, 0);
+  eq(rowsOf().length, 1, "saved with a date inside the month");
+});
+test("dates: a month field is two dropdowns (month, year) and fires change with YYYY-MM when both are chosen", () => {
+  start("basic", house);
+  openForm("salary");
+  const f = $("#ss-from");
+  const m = f.querySelector(".bp-m"), y = f.querySelector(".bp-y");
+  is(m && y && !f.querySelector("input"), "two selects, no native month box");
+  let seen = null; f.addEventListener("change", () => { seen = f.value; });
+  y.value = String(Number(plus(24).slice(0, 4))); y.dispatchEvent(new Event("change"));
+  m.value = "3"; m.dispatchEvent(new Event("change"));
+  eq(seen, `${plus(24).slice(0, 4)}-03`, "composed value");
+  eq(f.value, seen);
+  is([...m.options].some((o) => o.textContent === "March"), "month names, not numbers");
+});
+test("dates: tracker dates are day, month, year in that order", () => {
+  start("empty", tracker);
+  const order = [...$("#add-date").querySelectorAll("select")].map((s) => s.className);
+  eq(order.join(","), "bp-d,bp-m,bp-y", "Greek order");
 });
 test("tracker: dropping a category moves its logged purchases to Other", () => {
   const st = buildSample("empty");
@@ -729,6 +749,71 @@ test("tracker: dropping a category moves its logged purchases to Other", () => {
 test("tracker: without a plan it asks you to set up the Budget Plan first", () => {
   store.eraseAll(); stage.innerHTML = ""; tracker.render(stage);
   is(stage.textContent.includes("set up your Budget Plan first") && !!$('a[href="#/budget"]'), "prompt with a link");
+});
+
+/* ---------- House Planner switch, required price, monthly investing, paying the loan off ---------- */
+test("house: switched off, only the switch, the timeline and the expected future show; no stages", () => {
+  start("goals", house); // no house plan saved
+  is(!$("#house-active").checked, "the switch starts off");
+  is(!$("#a-h") && !$("#b-h") && !$("#c-h"), "stages A, B and C are hidden");
+  is($("#future-h"), "the expected future stays (it feeds the budget and investing)");
+  is($("#res-future").textContent.includes("fits") || $("#res-future").textContent.includes("covered") || !$("#res-future").textContent.includes("Enter a house price"), "no demand for a price while off");
+});
+test("house: switching on shows the stages and says the price is required; switching off hides them again", () => {
+  start("goals", house);
+  pick($("#house-active"));
+  eq(store.getState().house.active, true, "saved as on");
+  is($("#a-h") && $("#b-h") && $("#c-h"), "stages appear");
+  is($("#amount-error").textContent.includes("required"), "the price is flagged as required: " + $("#amount-error").textContent);
+  eq($("#f-amount").getAttribute("aria-invalid"), "true", "field marked invalid");
+  type($("#f-amount"), "150000");
+  eq($("#amount-error").textContent, "", "error gone once there is a price");
+  is($("#res-a").textContent.includes("Deposit ready in"), "the deposit date shows");
+  const sw = $("#house-active"); sw.checked = false; sw.dispatchEvent(new Event("change", { bubbles: true }));
+  eq(store.getState().house.active, false, "off again");
+  is(!$("#a-h"), "stages hidden again");
+  eq(store.getState().house.amount, 150000, "the price is kept in case the planner is switched back on");
+});
+test("house: a blank or zero price is not allowed while the planner is on", () => {
+  start("basic", house);
+  type($("#f-amount"), "");
+  eq(store.getState().house.amount, null, "blank means no price");
+  is($("#amount-error").textContent.includes("required"), "blank is flagged");
+  is($("#res-a").textContent.includes("Enter a house price"), "no dates without a price");
+  type($("#f-amount"), "0");
+  eq(store.getState().house.amount, null, "zero means no price");
+  is($("#amount-error").textContent.includes("required"), "zero is flagged");
+  type($("#f-amount"), "120000");
+  eq(store.getState().house.amount, 120000);
+});
+test("house: switched off, the saved price does not reach the other pages", () => {
+  const st = buildSample("basic"); st.house.active = false;
+  eq(project(inputFromState(st, plus(0))).fin.ok, false, "no house in the plan");
+});
+test("budget: the monthly investing card saves a share of free money and shows how it splits", () => {
+  start("goals", budget);
+  is($("#invest-card"), "the card is on the Budget Plan");
+  type($("#invest-pct"), "50");
+  eq(store.getState().settings.investPct, 50, "saved");
+  is($("#invest-split").textContent.includes("50% of free money"), "the split names the share: " + $("#invest-split").textContent);
+  type($("#invest-pct"), "150");
+  eq($("#invest-pct").getAttribute("aria-invalid"), "true", "more than 100% is refused");
+  eq(store.getState().settings.investPct, 50, "the last good value stays");
+  type($("#invest-pct"), "-5");
+  eq($("#invest-pct").getAttribute("aria-invalid"), "true", "a negative share is refused");
+  type($("#inv-returnPct"), "6");
+  eq(store.getState().house.invest.returnPct, 6, "the return is editable here too");
+});
+test("budget: with the House Planner on, the card says free money goes to the deposit first", () => {
+  start("basic", budget);
+  is($("#invest-card").textContent.includes("deposit"), "explained");
+});
+test("overview without a house shows the investing amount and the portfolio", () => {
+  const st = buildSample("goals"); st.settings.investPct = 40;
+  localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load();
+  setSelected(null); stage.innerHTML = ""; overview.render(stage);
+  is(stage.textContent.includes("Share of free money invested") && stage.textContent.includes("40%"), "investing share shown");
+  is(stage.textContent.includes("Investments after tax"), "the portfolio has its own column");
 });
 
 const failed = results.filter((r) => !r.ok);

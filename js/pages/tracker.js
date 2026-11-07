@@ -4,7 +4,7 @@ import { t, formatMoney, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
 import { esc, parseAmount } from "../components/dom.js";
 import { moneyInput } from "../components/money-input.js";
-import { monthField } from "../components/month-picker.js";
+import { monthField, dayField } from "../components/month-picker.js";
 import * as store from "../store.js";
 import { addMonths, isMonthKey, itemsFor, actualFor } from "../calc/budget.js";
 import { inputFromState, prepare, project, monthPicture, plannedDetail } from "../calc/projection.js";
@@ -93,7 +93,7 @@ export function render(root) {
     return `
       <tr data-id="${it.id}">
         <td class="ledger-icon"><span class="cat-icon" data-icon>${iconOf(it.catId)}</span></td>
-        <td data-label="${t("tracker.list.date")}"><input type="date" class="js-date" value="${it.date || ""}" min="${min}" max="${max}" aria-label="${esc(t("tracker.list.dateOf", { name: label }))}"></td>
+        <td data-label="${t("tracker.list.date")}">${dayField({ className: "js-date", label: t("tracker.list.dateOf", { name: label }), value: it.date || "", min, max })}</td>
         <td data-label="${t("tracker.list.name")}"><input type="text" class="js-name" maxlength="80" value="${esc(it.name)}" autocomplete="off" aria-label="${esc(t("tracker.list.nameOf", { n }))}"></td>
         <td data-label="${t("tracker.list.category")}"><select class="js-cat" aria-label="${esc(t("tracker.list.categoryOf", { name: label }))}">${categoryOptions(it.catId)}</select></td>
         <td class="num" data-label="${t("tracker.list.amount")}">${moneyInput({ id: `amt-${it.id}`, value: it.amount, ariaLabel: t("tracker.list.amountOf", { name: label }), className: "js-amount" })}</td>
@@ -106,7 +106,7 @@ export function render(root) {
     return `
       <tr class="add-row">
         <td class="ledger-icon"><span class="cat-icon" id="add-icon">${iconOf(lastCat)}</span></td>
-        <td data-label="${t("tracker.list.date")}"><input type="date" id="add-date" form="add-form" value="${defaultDate()}" min="${min}" max="${max}" aria-label="${t("tracker.list.newRow")}: ${t("tracker.list.date")}"></td>
+        <td data-label="${t("tracker.list.date")}">${dayField({ id: "add-date", label: `${t("tracker.list.newRow")}: ${t("tracker.list.date")}`, value: defaultDate(), min, max })}</td>
         <td data-label="${t("tracker.list.name")}"><input type="text" id="add-name" form="add-form" maxlength="80" autocomplete="off" placeholder="${esc(t("tracker.list.namePh"))}" aria-label="${t("tracker.list.newRow")}: ${t("tracker.list.name")}"></td>
         <td data-label="${t("tracker.list.category")}"><select id="add-cat" form="add-form" aria-label="${t("tracker.list.newRow")}: ${t("tracker.list.category")}">${categoryOptions(lastCat)}</select></td>
         <td class="num" data-label="${t("tracker.list.amount")}">${moneyInput({ id: "add-amount", value: "", ariaLabel: `${t("tracker.list.newRow")}: ${t("tracker.list.amount")}`, dataAttrs: 'form="add-form"' })}</td>
@@ -211,9 +211,6 @@ export function render(root) {
     setSelected(selected);
     computePlan();
     wrap.innerHTML = mainHtml();
-    wrap.querySelectorAll('input[type="month"]').forEach((el) => {
-      if (el.type !== "month") el.setAttribute("title", "YYYY-MM"); // browsers without a month picker
-    });
     if (focusSel) { const el = $(focusSel); if (el) el.focus(); }
   }
 

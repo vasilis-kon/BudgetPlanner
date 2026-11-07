@@ -97,6 +97,37 @@ export function render(root) {
       </section>`;
   }
 
+  /** How the selected month's free money splits between investing and the bank (nothing is invested before this month). */
+  function investSplitHtml(sum) {
+    const pct = state().settings.investPct || 0;
+    if (!(pct > 0)) return `<p class="small muted">${t("budget.invest.none")}</p>`;
+    if (selected < currentMonth()) return "";
+    const free = Math.max(0, sum.freeIfPlanned);
+    const invested = free * pct / 100;
+    return `<p class="stat-sub"><strong>${t("budget.invest.split", { pct: Math.round(pct * 100) / 100, free: eur(free), invested: eur(invested), bank: eur(free - invested) })}</strong></p>`;
+  }
+
+  function investHtml(sum) {
+    const st = state();
+    const inv = st.house.invest;
+    const field = (key, label, max, step) => `<div class="field"><label for="inv-${key}">${label}</label><div class="input-unit"><input type="number" id="inv-${key}" data-inv="${key}" inputmode="decimal" min="0" max="${max}" step="${step}" value="${inv[key]}"><span aria-hidden="true">%</span></div></div>`;
+    return `
+      <div class="card-head">${icon("trending-up")}<h2 id="invest-h">${t("budget.invest.title")}</h2></div>
+      <p class="muted">${t("budget.invest.intro")}</p>
+      <div class="field" style="max-width:18rem">
+        <label for="invest-pct">${t("budget.invest.amountLabel")}</label>
+        <div class="input-unit"><input type="number" id="invest-pct" inputmode="decimal" min="0" max="100" step="1" value="${st.settings.investPct || ""}" placeholder="0" aria-describedby="invest-hint"><span aria-hidden="true">%</span></div>
+        <span class="hint" id="invest-hint">${t("budget.invest.amountHint")}</span>
+      </div>
+      <div id="invest-split" aria-live="polite" style="margin-top:var(--space-3)">${investSplitHtml(sum)}</div>
+      ${st.house.active ? `<div class="note" style="margin-top:var(--space-3)">${icon("house", { size: 18 })}<p>${t("budget.invest.houseOn")} <a href="#/house">${t("budget.home.link")}</a></p></div>` : ""}
+      <details style="margin-top:var(--space-3)">
+        <summary><strong>${t("budget.invest.assumptions")}</strong></summary>
+        <div class="form-row" style="margin-top:var(--space-3)">${field("returnPct", t("budget.invest.returnLabel"), 30, 0.5)}${field("feePct", t("budget.invest.feeLabel"), 5, 0.01)}${field("taxPct", t("budget.invest.taxLabel"), 60, 1)}</div>
+        <p class="small muted">${t("budget.invest.assumptionsHint")}</p>
+      </details>`;
+  }
+
   function goalsHtml() {
     const { lines, total } = goalLines();
     if (!lines.length) {
@@ -288,6 +319,7 @@ export function render(root) {
           <section class="card" id="salary-card" aria-labelledby="salary-h">${salaryHtml(sum)}</section>
         </div>
         ${homeHtml()}
+        <section class="card" id="invest-card" aria-labelledby="invest-h">${investHtml(sum)}</section>
         <section class="card" id="goals-card" aria-labelledby="goals-h">${goalsHtml()}</section>
         <section class="card" id="expenses-card" aria-labelledby="exp-h">${expensesHtml()}</section>
         <section class="card" aria-labelledby="bonus-h">
@@ -326,9 +358,6 @@ export function render(root) {
       wrap.innerHTML = mainHtml();
       refresh();
     }
-    wrap.querySelectorAll('input[type="month"]').forEach((el) => {
-      if (el.type !== "month") el.setAttribute("title", "YYYY-MM"); // browsers without a month picker
-    });
     if (focusSel) { const el = $(focusSel); if (el) el.focus(); }
   }
 
@@ -346,6 +375,7 @@ export function render(root) {
     card.className = `card free-card ${free.cls}`;
     card.innerHTML = free.html;
     $("#total-planned").textContent = eur(sum.planned);
+    $("#invest-split").innerHTML = investSplitHtml(sum);
   }
 
   function syncPlannedInput(input) {
@@ -450,6 +480,17 @@ export function render(root) {
       });
       if (v !== null) el.classList.remove("inherited");
       refresh();
+    } else if (el.id === "invest-pct") {
+      const v = parseAmount(el.value);
+      if (Number.isNaN(v) || (v !== null && (v < 0 || v > 100))) { el.setAttribute("aria-invalid", "true"); return; }
+      el.removeAttribute("aria-invalid");
+      store.update((s) => { s.settings.investPct = v || 0; });
+      refresh();
+    } else if (el.dataset.inv) {
+      const v = parseAmount(el.value);
+      if (v === null || Number.isNaN(v) || v < Number(el.min) || v > Number(el.max)) { el.setAttribute("aria-invalid", "true"); return; }
+      el.removeAttribute("aria-invalid");
+      store.update((s) => { s.house.invest[el.dataset.inv] = v; });
     } else if (el.id === "bonus-share") {
       const v = parseAmount(el.value);
       if (v === null || Number.isNaN(v) || v > 100) return;
@@ -468,6 +509,7 @@ export function render(root) {
       setSelected(selected);
       draw("#start-input");
     } else if (el.classList.contains("js-planned") && el.value.trim() === "") syncPlannedInput(el);
+    else if (el.dataset.inv) { el.removeAttribute("aria-invalid"); el.value = state().house.invest[el.dataset.inv]; }
     else if (el.id === "bonus-share") {
       const v = parseAmount(el.value);
       const ok = v !== null && !Number.isNaN(v) && v <= 100;

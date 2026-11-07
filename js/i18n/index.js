@@ -35,6 +35,10 @@ export function formatMonthShort(key) {
   return monthShortFmt.format(new Date(Date.UTC(y, m - 1, 1)));
 }
 
+const monthNameFmt = new Intl.DateTimeFormat(LOCALE, { month: "long", timeZone: "UTC" });
+/** The twelve month names, January first, for dropdowns. */
+export const monthNames = () => Array.from({ length: 12 }, (_, i) => monthNameFmt.format(new Date(Date.UTC(2024, i, 1))));
+
 const dayFmt = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 /** "2026-11-07" becomes "7 November 2026". */
 export function formatDay(iso) {

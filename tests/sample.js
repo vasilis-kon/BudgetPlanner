@@ -29,7 +29,7 @@ export function buildSample(variant = "full", { theme = "system", now = new Date
       { id: "i3", date: `${start}-03`, name: "Tickets to London", catId: "travel", amount: 180 },
     ];
   }
-  if (variant !== "empty" && variant !== "goals") state.house = { mode: "price", amount: variant === "short" ? 300000 : 150000, ltvPct: 80, costsPct: 7, buffer: 5000 };
+  if (variant !== "empty" && variant !== "goals") state.house = { active: true, mode: "price", amount: variant === "short" ? 300000 : 150000, ltvPct: 80, costsPct: 7, buffer: 5000 };
   if (variant === "goals") {
     state.goals = [
       { id: "car", approved: true, draft: null, data: { name: "Dream Car", start: plus(3), target: plus(15), amount: 3600, mode: "auto", monthly: null, ongoing: 90, paybackAmount: 0, paybackTo: "deposit", replaces: "transport" } },

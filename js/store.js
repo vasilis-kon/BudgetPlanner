@@ -22,6 +22,7 @@ export const DEFAULT_CATEGORIES = [
 /** Starting values for the House Planner. `amount` stays empty until the user enters a price or loan. */
 export function defaultHouse() {
   return {
+    active: false, // the House Planner is optional: nothing about a house counts until the user switches it on
     mode: "price", // which figure the user enters: "price" or "loan"
     amount: null,
     ltvPct: 80,
@@ -43,7 +44,7 @@ export function defaultHouse() {
 export function emptyState() {
   return {
     version: VERSION,
-    settings: { startMonth: null, bonusSharePct: 50, theme: "system" },
+    settings: { startMonth: null, bonusSharePct: 50, investPct: 0, theme: "system" },
     salary: [], // [{ from: "YYYY-MM", amount }]
     categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })),
     months: {}, // { "YYYY-MM": { planned: { catId: € baseline from this month }, items: [{ id, date: "YYYY-MM-DD"|null, name, catId, amount }] } }
@@ -65,6 +66,7 @@ export function sanitize(raw) {
   const st = raw.settings || {};
   s.settings.startMonth = isMonthKey(st.startMonth) ? st.startMonth : null;
   s.settings.bonusSharePct = num(st.bonusSharePct) ? Math.min(100, Math.max(0, st.bonusSharePct)) : 50;
+  s.settings.investPct = num(st.investPct) ? Math.min(100, Math.max(0, Math.round(st.investPct * 100) / 100)) : 0;
   s.settings.theme = ["light", "dark", "system"].includes(st.theme) ? st.theme : "system";
   if (Array.isArray(raw.salary)) {
     s.salary = raw.salary
@@ -165,6 +167,8 @@ export function sanitizeHouse(raw, validCats) {
   const cats = validCats || new Set();
   d.mode = h.mode === "loan" ? "loan" : "price";
   d.amount = num(h.amount) && h.amount > 0 ? h.amount : null;
+  // Older saves had no switch: a plan with a price was a house plan.
+  d.active = typeof h.active === "boolean" ? h.active : d.amount !== null;
   d.ltvPct = clamp(h.ltvPct, 1, 100, d.ltvPct);
   d.costsPct = clamp(h.costsPct, 0, 30, d.costsPct);
   d.buffer = clamp(h.buffer, 0, 1e7, d.buffer);

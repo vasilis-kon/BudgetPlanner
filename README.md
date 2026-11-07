@@ -49,7 +49,7 @@ Icons are from [Lucide](https://lucide.dev) (v0.468.0), copied into `js/componen
 ES modules do not load from `file://`, so opening `index.html` by double-clicking will show a blank page. Start any local web server in this folder:
 
 ```
-python -m http.server 8000
+python serve.py
 ```
 
 then open <http://localhost:8000>. (Alternatives: `npx serve`, or the VS Code "Live Server" extension.)

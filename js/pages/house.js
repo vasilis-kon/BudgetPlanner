@@ -62,10 +62,10 @@ export function render(root) {
 
   /* ---------- small HTML builders ---------- */
 
-  function num(path, label, { min = 0, max = 1e9, step = "any", unit = "", hint = "" } = {}) {
+  function num(path, label, { min = 0, max = 1e9, step = "any", unit = "", hint = "", required = false } = {}) {
     const v = get(st().house, path);
     const id = fid(path);
-    const input = `<input type="number" id="${id}" inputmode="decimal" min="${min}" max="${max}" step="${step}" value="${v ?? ""}" data-path="${path}" ${hint ? `aria-describedby="${id}-h"` : ""}>`;
+    const input = `<input type="number" id="${id}" inputmode="decimal" min="${min}" max="${max}" step="${step}" value="${v ?? ""}" data-path="${path}" ${required ? "required" : ""} ${hint ? `aria-describedby="${id}-h"` : ""}>`;
     return `<div class="field"><label for="${id}">${label}</label>${unit ? `<div class="input-unit">${input}<span aria-hidden="true">${unit}</span></div>` : input}${hint ? `<span class="hint" id="${id}-h">${hint}</span>` : ""}</div>`;
   }
 
@@ -234,8 +234,8 @@ export function render(root) {
   }
 
   function futureResult(a) {
-    if (!a.r.fin.ok) return note("", "info", t("house.check.needHouse"));
-    if (!a.r.problems.length) return note("note-ok", "circle-check", `<strong>${t("house.check.ok")}</strong> ${t("house.check.okDetail")}`);
+    if (!a.r.fin.ok && a.h.active) return note("", "info", t("house.check.needHouse"));
+    if (!a.r.problems.length) return note("note-ok", "circle-check", `<strong>${t("house.check.ok")}</strong> ${t(a.r.fin.ok ? "house.check.okDetail" : "house.check.okNoHouse")}`);
     const items = a.r.problems.map((p) => `<li>${t(p.kind === "expenses" ? "house.check.expenses" : "house.check.installment", { range: range(p.from, p.to), amount: eur(p.worst), months: p.months })}</li>`).join("");
     return note("note-warn", "triangle-alert", `<strong>${t("house.check.bad", { count: a.r.problems.length })}</strong>`) + `<ul style="margin-top:var(--space-3)">${items}</ul><p class="small muted">${t("house.check.fixHint")}</p>`;
   }
@@ -252,7 +252,8 @@ export function render(root) {
         <div class="grid grid-2">
           <div class="stack">
             ${radios("mode", t("house.a.mode"), [["price", t("house.a.modePrice")], ["loan", t("house.a.modeLoan")]])}
-            ${num("amount", modeLabel, { min: 1, max: 1e8, step: 1000, hint: t("house.a.amountHint") })}
+            ${num("amount", modeLabel, { min: 1, max: 1e8, step: 1000, hint: t("house.a.amountHint"), required: true })}
+            <p class="error" id="amount-error" role="alert"></p>
             ${num("ltvPct", t("house.a.ltv"), { min: 1, max: 100, step: 1, unit: "%", hint: t("house.a.ltvHint") })}
             ${num("costsPct", t("house.a.costs"), { min: 0, max: 30, step: 0.5, unit: "%", hint: t("house.a.costsHint") })}
             ${num("buffer", t("house.a.buffer"), { min: 0, max: 1e7, step: 500, hint: t("house.a.bufferHint") })}
@@ -498,6 +499,19 @@ export function render(root) {
       </section>`;
   }
 
+  function activeHtml() {
+    const h = st().house;
+    return `
+      <section class="card" aria-labelledby="active-h">
+        <h2 id="active-h">${t("house.active.title")}</h2>
+        <div class="field">
+          <label class="choice"><input type="checkbox" id="house-active" data-check="active" ${h.active ? "checked" : ""} aria-describedby="active-hint"><span><strong>${t("house.active.label")}</strong></span></label>
+          <span class="hint" id="active-hint">${t("house.active.hint")}</span>
+        </div>
+        ${h.active ? "" : `<div class="note">${icon("info", { size: 18 })}<p>${t("house.active.off")}</p></div>`}
+      </section>`;
+  }
+
   function pageHtml() {
     const s = st();
     const head = `<div class="page-head"><h1>${t("house.title")}</h1><p>${t("house.intro")}</p>${noticeHtml()}</div>`;
@@ -505,7 +519,7 @@ export function render(root) {
       return `${head}<section class="card soon-card"><p>${t("house.needBudget")}</p><a class="btn btn-primary" href="#/budget">${t("house.needBudgetCta")}${icon("chevron-right")}</a></section>`;
     }
     lastA = analyse();
-    return `${head}<div class="stack-lg"><div id="res-overspend"></div>${toolbarHtml()}${futureHtml(lastA)}${stageAHtml()}${stageBHtml()}${stageCHtml()}</div>`;
+    return `${head}<div class="stack-lg"><div id="res-overspend"></div>${activeHtml()}${toolbarHtml()}${futureHtml(lastA)}${st().house.active ? stageAHtml() + stageBHtml() + stageCHtml() : ""}</div>`;
   }
 
   function refresh() {
@@ -514,9 +528,14 @@ export function render(root) {
     lastA = a;
     $("#res-overspend").innerHTML = overspendHtml({ inp: a.inp, prep: a.prep, r: a.r, categories: a.s.categories }, { onHouse: true });
     $("#res-future").innerHTML = futureResult(a);
-    $("#res-a").innerHTML = stageAResult(a);
-    $("#res-b").innerHTML = stageBResult(a);
-    $("#res-c").innerHTML = stageCResult(a);
+    if (a.h.active) {
+      $("#res-a").innerHTML = stageAResult(a);
+      $("#res-b").innerHTML = stageBResult(a);
+      $("#res-c").innerHTML = stageCResult(a);
+      const price = $("#f-amount"), missing = !(a.h.amount > 0);
+      if (missing) price.setAttribute("aria-invalid", "true"); else price.removeAttribute("aria-invalid");
+      $("#amount-error").textContent = missing ? t("house.active.required") : "";
+    }
     clearTimeout(chartTimer);
     chartTimer = setTimeout(() => drawCharts(a), 250);
   }
@@ -525,9 +544,6 @@ export function render(root) {
     unmountCharts.forEach((fn) => fn());
     unmountCharts = [];
     wrap.innerHTML = pageHtml();
-    wrap.querySelectorAll('input[type="month"]').forEach((el) => {
-      if (el.type !== "month") el.setAttribute("title", "YYYY-MM");
-    });
     refresh();
     updateEventSummary();
     if (focusSel) { const el = $(focusSel); if (el) el.focus(); }
@@ -545,6 +561,7 @@ export function render(root) {
   function overspendAfter(mutate) {
     const house = JSON.parse(JSON.stringify(st().house));
     mutate(house);
+    if (!house.active) house.amount = null; // no house is planned, so none is counted
     const inp = { ...inputFromState(st(), currentMonth()), house };
     const r = project(inp, prepare(inp));
     return newShortfalls(lastA.r.shortByMonth, r.shortByMonth);
@@ -664,6 +681,11 @@ export function render(root) {
       return;
     }
     const v = parseAmount(el.value);
+    if (path === "amount" && (v === null || Number.isNaN(v) || v <= 0)) { // the price is mandatory: blank or zero means no price yet
+      store.update((x) => { x.house.amount = null; });
+      refresh();
+      return;
+    }
     if (v === null || Number.isNaN(v) || v < Number(el.min) || v > Number(el.max)) { el.setAttribute("aria-invalid", "true"); return; }
     el.removeAttribute("aria-invalid");
     store.update((s) => set(s.house, path, v));
@@ -674,7 +696,7 @@ export function render(root) {
     const el = e.target;
     if (el.id === "ev-start") { rebuildEventCosts(); return; }
     if (el.dataset.path && el.type === "number") {
-      el.removeAttribute("aria-invalid");
+      if (el.dataset.path !== "amount") el.removeAttribute("aria-invalid");
       el.value = get(st().house, el.dataset.path) ?? ""; // put back the last valid value if the entry was empty or out of range
     } else if (el.dataset.path && el.type === "radio") {
       store.update((s) => set(s.house, el.dataset.path, el.value));

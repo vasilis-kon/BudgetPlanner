@@ -22,6 +22,7 @@ function baseState(over = {}) {
   st.settings.startMonth = TODAY;
   st.salary = [{ from: TODAY, amount: 2000 }];
   st.months[TODAY] = { planned: { rent: 600, groceries: 300 }, actual: {} };
+  st.house.active = true;
   st.house.amount = 150000;
   Object.assign(st, over);
   return st;
@@ -804,6 +805,69 @@ test("spending logged in a finished month replaces its baseline in the projectio
   st.months[TODAY].items[0].amount = 400;
   eq(prepare(inputFromState(st, TODAY)).amounts[2][g], 300, "this month: even overspending does not change the projection until the month ends");
   eq(prepare(inputFromState(st, addMonths(TODAY, 1))).amounts[2][g], 400, "once next month starts, this month counts what was really spent");
+});
+
+/* ---------- monthly investing, and the House Planner switch ---------- */
+const noRisk = (st) => { st.house.invest.returnPct = 0; st.house.invest.feePct = 0; st.house.invest.taxPct = 0; return st; };
+test("monthly investing: a share of free money goes into the portfolio from this month, the rest stays in the bank (no house)", () => {
+  const st = noRisk(noHouse()); st.settings.investPct = 50;
+  const rs = savings(st);
+  near(rs.rows[0].invested, 550, 1e-9, "half of the 1,100 that is free");
+  near(rs.years[0].nom.investments, 1100, 0.01, "two months invested");
+  near(rs.years[0].nom.savings, 3200 - 1100, 0.01, "the other half and the saved bonus half stay as savings");
+  near(rs.years[0].nom.netWorth, 3200, 0.01, "investing moves money, it does not create it when the return is zero");
+});
+test("monthly investing: expenses + goals + investing never exceed the salary, at any share", () => {
+  for (const pct of [0, 25, 50, 100]) {
+    const st = noRisk(noHouse()); st.settings.investPct = pct;
+    st.goals = [{ id: "g1", approved: true, draft: null, data: goalFields({ name: "Trip", start: "2027-01", target: "2028-01", amount: 3600 }) }];
+    const rs = savings(st);
+    for (const r of rs.rows) is(r.invested >= 0 && r.invested <= Math.max(0, r.leftover) + 1e-9, `${pct}%: invested ${r.invested} within free money ${r.leftover} in ${r.key}`);
+  }
+  const st = noRisk(noHouse()); st.settings.investPct = 100;
+  const rs = savings(st);
+  near(rs.rows[0].leftover - rs.rows[0].invested, 0, 1e-9, "at 100% everything free is invested and nothing more");
+});
+test("monthly investing: the portfolio earns the return and pays tax on gains", () => {
+  const st = noHouse(); st.settings.investPct = 50; st.house.invest.returnPct = 6; st.house.invest.feePct = 0; st.house.invest.taxPct = 20;
+  const rs = savings(st);
+  const last = rs.rows.at(-1);
+  const put = rs.rows.reduce((a, r) => a + r.invested, 0);
+  is(last.investments > put, "gains on top of what was put in");
+  is(last.investments < put * 2, "but plausible");
+  is(last.investments < put + (last.investments - put) / 0.8 + 1, "tax was taken from the gains, not from the money put in");
+});
+test("monthly investing: nothing is invested in months before today", () => {
+  const st = noRisk(noHouse()); st.settings.startMonth = "2026-09"; st.months["2026-09"] = { planned: { rent: 600, groceries: 300 }, items: [] }; st.settings.investPct = 50;
+  const rs = savings(st);
+  eq(rs.rows[0].invested, 0, "September is past"); eq(rs.rows[1].invested, 0, "October is past"); near(rs.rows[2].invested, 550, 1e-9, "November is now");
+});
+test("sanitize keeps the investing share between 0 and 100 and drops nonsense", () => {
+  const st = baseState(); st.settings.investPct = 33.456;
+  near(sanitize(JSON.parse(JSON.stringify(st))).settings.investPct, 33.46, 1e-9);
+  st.settings.investPct = 150; eq(sanitize(JSON.parse(JSON.stringify(st))).settings.investPct, 100, "capped at 100");
+  for (const bad of [-5, "x", null]) { const b = JSON.parse(JSON.stringify(st)); b.settings.investPct = bad; eq(sanitize(b).settings.investPct, bad === -5 ? 0 : 0, "bad " + bad); }
+});
+test("House Planner switch: off means no house in the plan even with a price saved; on brings it back", () => {
+  const st = baseState(); st.house.active = false;
+  eq(project(inputFromState(st, TODAY)).fin.ok, false, "off");
+  st.house.active = true;
+  eq(project(inputFromState(st, TODAY)).fin.ok, true, "on");
+});
+test("House Planner switch: an older save with a price counts as on, one without a price as off, an explicit choice wins", () => {
+  const raw = (house) => ({ version: 1, settings: {}, salary: [], months: {}, goals: [], house });
+  eq(sanitize(raw({ amount: 150000 })).house.active, true);
+  eq(sanitize(raw({})).house.active, false);
+  eq(sanitize(raw({ amount: 150000, active: false })).house.active, false);
+  eq(sanitize(raw({ amount: 0, active: true })).house.amount, null, "a zero price is no price");
+  eq(emptyState().house.active, false, "a new plan starts with the planner off");
+});
+test("House Planner on: all free money goes to the deposit until the house is bought, whatever the monthly investing says", () => {
+  const a = baseState(); a.settings.investPct = 0;
+  const b = baseState(); b.settings.investPct = 80;
+  const ra = project(inputFromState(a, TODAY)), rb = project(inputFromState(b, TODAY));
+  eq(rb.depositReady, ra.depositReady, "same deposit date");
+  near(rb.rows[0].depositSavings, ra.rows[0].depositSavings, 1e-9, "same deposit pot");
 });
 
 /* ---------- report ---------- */

@@ -35,15 +35,16 @@ export function render(root) {
     const range = rs.retireKey ? t("overview.sv.rangeAge", { retire: RETIREMENT_AGE, month: formatMonth(rs.endKey) }) : t("overview.sv.rangeAhead", { years: Math.round(monthsBetween(today, rs.endKey) / 12) });
     const stats = `<dl class="stat-grid">
       <div class="stat"><dt>${t("overview.sv.sFree")}</dt><dd>${eur(nowRow ? nowRow.leftover : 0)}</dd><dd class="sub">${t("overview.sv.sFreeSub")}</dd></div>
+      <div class="stat"><dt>${t("overview.sv.sInvest")}</dt><dd>${rs.investPct > 0 ? `${Math.round(rs.investPct * 100) / 100}%` : t("overview.sv.sInvestNone")}</dd><dd class="sub">${rs.investPct > 0 ? t("overview.sv.sInvestSub", { amount: eur(Math.max(0, nowRow ? nowRow.leftover : 0) * rs.investPct / 100) }) : `<a href="#/budget">${t("overview.sv.sInvestLink")}</a>`}</dd></div>
       <div class="stat"><dt>${t("overview.sv.sSaved", { month: formatMonth(rs.endKey) })}</dt><dd>${eur(pick(last).netWorth)}</dd><dd class="sub">${t("overview.sv.sSavedSub")}</dd></div>
       <div class="stat"><dt>${t("overview.sv.sGoals")}</dt><dd>${t("overview.sv.sGoalsVal", { done, total: rs.reached.length })}</dd><dd class="sub">${goalsSub}</dd></div>
     </dl>`;
     const rows = rs.years.map((y) => {
       const v = pick(y);
-      return `<tr><th scope="row">${y.year}</th><td class="num">${eur(v.savings)}</td><td class="num">${eur(v.goalFunds)}</td><td class="num"><strong>${eur(v.netWorth)}</strong></td></tr>`;
+      return `<tr><th scope="row">${y.year}</th><td class="num">${eur(v.savings)}</td><td class="num">${eur(v.investments)}</td><td class="num">${eur(v.goalFunds)}</td><td class="num"><strong>${eur(v.netWorth)}</strong></td></tr>`;
     }).join("");
     const tableHtml = `<table class="data-table">
-      <thead><tr><th scope="col">${t("overview.colYear")}</th><th scope="col" class="num">${t("overview.sv.colSavings")}</th><th scope="col" class="num">${t("overview.sv.colGoals")}</th><th scope="col" class="num">${t("overview.sv.colTotal")}</th></tr></thead>
+      <thead><tr><th scope="col">${t("overview.colYear")}</th><th scope="col" class="num">${t("overview.sv.colSavings")}</th><th scope="col" class="num">${t("overview.sv.colInvest")}</th><th scope="col" class="num">${t("overview.sv.colGoals")}</th><th scope="col" class="num">${t("overview.sv.colTotal")}</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
     wrap.innerHTML = `
       ${headFor(true)}
@@ -79,6 +80,7 @@ export function render(root) {
         labels: rs.years.map((y) => String(y.year)),
         datasets: [
           { type: "bar", label: t("overview.sv.colSavings"), data: rs.years.map((y) => Math.round(pick(y).savings)), backgroundColor: th.bank, stack: "money", order: 2 },
+          { type: "bar", label: t("overview.sv.colInvest"), data: rs.years.map((y) => Math.round(pick(y).investments)), backgroundColor: th.invest, stack: "money", order: 2 },
           { type: "bar", label: t("overview.sv.colGoals"), data: rs.years.map((y) => Math.round(pick(y).goalFunds)), backgroundColor: th.fund, stack: "money", order: 2 },
           { type: "line", label: t("overview.sv.colTotal"), data: rs.years.map((y) => Math.round(pick(y).netWorth)), borderColor: th.text, backgroundColor: th.text, borderWidth: 3, pointStyle: "triangle", pointRadius: 4, order: 0 },
         ],
@@ -145,10 +147,10 @@ export function render(root) {
     const label = (y) => (y.year === dfYear ? t("overview.lastYear", { year: y.year, month: formatMonth(r.debtFree).split(" ")[0] }) : String(y.year));
     const rows = years.map((y) => {
       const v = pick(y);
-      return `<tr><th scope="row">${label(y)}</th><td class="num">${eur(v.depositSavings)}</td><td class="num">${eur(v.buffer)}</td><td class="num">${eur(v.goalFunds)}</td><td class="num">${eur(v.unspent)}</td><td class="num">${eur(v.investments)}</td><td class="num">${eur(v.home)}</td><td class="num">${eur(v.loan)}</td><td class="num"><strong>${eur(v.netWorth)}</strong></td></tr>`;
+      return `<tr><th scope="row">${label(y)}</th><td class="num">${eur(v.depositSavings)}</td><td class="num">${eur(v.buffer + v.unspent)}</td><td class="num">${eur(v.goalFunds)}</td><td class="num">${eur(v.investments)}</td><td class="num">${eur(v.home)}</td><td class="num">${eur(v.loan)}</td><td class="num"><strong>${eur(v.netWorth)}</strong></td></tr>`;
     }).join("");
     const tableHtml = `<table class="data-table">
-      <thead><tr><th scope="col">${t("overview.colYear")}</th><th scope="col" class="num">${t("overview.colDeposit")}</th><th scope="col" class="num">${t("overview.colBuffer")}</th><th scope="col" class="num">${t("overview.colFunds")}</th><th scope="col" class="num">${t("overview.colUnspent")}</th><th scope="col" class="num">${t("overview.colInvest")}</th><th scope="col" class="num">${t("overview.colHome")}</th><th scope="col" class="num">${t("overview.colLoan")}</th><th scope="col" class="num">${t("overview.colNetWorth")}</th></tr></thead>
+      <thead><tr><th scope="col">${t("overview.colYear")}</th><th scope="col" class="num">${t("overview.colDeposit")}</th><th scope="col" class="num">${t("overview.colBank")}</th><th scope="col" class="num">${t("overview.colFunds")}</th><th scope="col" class="num">${t("overview.colInvest")}</th><th scope="col" class="num">${t("overview.colHome")}</th><th scope="col" class="num">${t("overview.colLoan")}</th><th scope="col" class="num">${t("overview.colNetWorth")}</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
     const unitLabel = units === "today" ? t("house.c.unitsTodayShort") : t("house.c.unitsFutureShort");
 
@@ -179,7 +181,7 @@ export function render(root) {
 
     const money = (v) => formatCompact(v);
     unmount.push(mountChart(wrap.querySelector("#ch-ov"), (th) => {
-      const column = (labelKey, key, colour) => ({ type: "bar", label: t(labelKey), data: years.map((y) => Math.round(pick(y)[key])), backgroundColor: colour, stack: "money", order: 2 });
+      const column = (labelKey, key, colour) => ({ type: "bar", label: t(labelKey), data: years.map((y) => Math.round(key === "bank" ? pick(y).buffer + pick(y).unspent : pick(y)[key])), backgroundColor: colour, stack: "money", order: 2 });
       const opts = baseOptions(th, money, { x: { stacked: true }, y: { stacked: true }, tip: eur });
       return {
         type: "bar",
@@ -187,9 +189,8 @@ export function render(root) {
           labels: years.map((y) => String(y.year)),
           datasets: [
             column("overview.colDeposit", "depositSavings", th.bank),
-            column("overview.colBuffer", "buffer", th.buffer),
+            column("overview.colBank", "bank", th.buffer),
             column("overview.colFunds", "goalFunds", th.fund),
-            column("overview.colUnspent", "unspent", th.living),
             column("overview.colInvest", "investments", th.invest),
             column("overview.colHome", "home", th.installment),
             { type: "line", label: t("overview.colNetWorth"), data: years.map((y) => Math.round(pick(y).netWorth)), borderColor: th.text, backgroundColor: th.text, borderWidth: 3, pointStyle: "triangle", pointRadius: 4, order: 0 },

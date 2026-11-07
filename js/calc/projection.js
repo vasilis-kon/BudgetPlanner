@@ -37,7 +37,9 @@ export function inputFromState(st, today) {
     months: st.months,
     bonusSharePct: st.settings.bonusSharePct,
     goals: approvedGoals(st.goals),
-    house: st.house,
+    // With the House Planner switched off the plan is investing and saving only: the house is simply not there.
+    house: st.house.active ? st.house : { ...st.house, amount: null },
+    investPct: st.settings.investPct || 0, // percent of each month's free money that goes into the ETF portfolio, from today on
     endKey: retirementKey(today, st.house.age), // keep going after debt-free until this month (age 65)
   };
 }
@@ -381,7 +383,11 @@ export function projectSavings(inp, prep = prepare(inp)) {
     feasible: true, reached: [],
   };
   const flags = [];
-  let cash = 0;
+  const monthlyReturn = Math.pow(1 + (house.invest.returnPct - house.invest.feePct) / 100, 1 / 12) - 1;
+  const taxRate = house.invest.taxPct / 100;
+  const investShare = Math.min(100, Math.max(0, inp.investPct || 0)) / 100;
+  out.investPct = investShare * 100;
+  let cash = 0, P = 0, basis = 0;
   for (let i = 0; i < prep.H; i++) {
     const key = prep.keys[i];
     if (key > endKey) break;
@@ -401,14 +407,19 @@ export function projectSavings(inp, prep = prepare(inp)) {
     let removed = 0;
     for (const c of replaced) { const k = prep.categoryIds.indexOf(c); if (k >= 0) removed += prep.amounts[i][k]; }
     const leftover = salary - (prep.spend[i] - removed) - goalContrib - ongoing;
-    cash += leftover + bonusSaved + payback;
+    // A share of free money is invested, from this month on. A share of what is left after expenses and goals can never
+    // push expenses + goals + investing above the salary.
+    const invested = key >= today ? Math.max(0, leftover) * investShare : 0;
+    cash += leftover - invested + bonusSaved + payback;
+    P = P * (1 + monthlyReturn) + invested; basis += invested;
+    const afterTax = P - Math.max(0, P - basis) * taxRate;
     if (leftover < -EPS && key >= today) flags.push({ key, kind: "expenses", short: -leftover });
     const goalFunds = [...funds.values()].reduce((a, b) => a + b, 0);
-    const row = { key, salary, leftover, savings: cash, goalFunds, netWorth: cash + goalFunds };
+    const row = { key, salary, leftover, invested, savings: cash, investments: afterTax, goalFunds, netWorth: cash + goalFunds + afterTax };
     out.rows.push(row);
     if (month === 12 || key === endKey) {
       const f = todayFactor(today, key, infl);
-      const snap = (k) => ({ savings: row.savings * k, goalFunds: row.goalFunds * k, netWorth: row.netWorth * k });
+      const snap = (k) => ({ savings: row.savings * k, investments: row.investments * k, goalFunds: row.goalFunds * k, netWorth: row.netWorth * k });
       out.years.push({ year: Number(key.slice(0, 4)), key, nom: snap(1), real: snap(f) });
     }
   }

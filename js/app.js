@@ -64,6 +64,35 @@ function renderHeader() {
   $("theme-toggle").addEventListener("click", toggleTheme);
   updateThemeButton();
   syncToggle();
+  setupRailTips();
+}
+
+/** In the icon-only sidebar, pointing at (or tabbing to) an icon shows the page's name beside it. */
+function setupRailTips() {
+  const tip = document.createElement("div");
+  tip.className = "nav-tip";
+  tip.setAttribute("role", "tooltip");
+  tip.hidden = true;
+  document.body.appendChild(tip);
+  const header = $("site-header");
+  const hide = () => { tip.hidden = true; };
+  const show = (e) => {
+    const el = e.target.closest(".main-nav a, .brand, #menu-toggle, #theme-toggle");
+    if (!el || !wide.matches || !document.documentElement.classList.contains("nav-collapsed")) return hide();
+    const span = el.querySelector("span");
+    tip.textContent = (span ? span.textContent : el.getAttribute("aria-label") || el.title || "").trim();
+    if (!tip.textContent) return hide();
+    const r = el.getBoundingClientRect();
+    tip.style.left = `${r.right + 10}px`;
+    tip.style.top = `${r.top + r.height / 2}px`;
+    tip.hidden = false;
+  };
+  header.addEventListener("mouseover", show);
+  header.addEventListener("mouseout", hide);
+  header.addEventListener("focusin", (e) => { if (e.target.matches(":focus-visible")) show(e); });
+  header.addEventListener("focusout", hide);
+  header.addEventListener("click", hide);
+  document.addEventListener("scroll", hide, true);
 }
 
 // Wide screens: a sidebar that can shrink to an icon rail (remembered). Narrow screens: a slide-in drawer.

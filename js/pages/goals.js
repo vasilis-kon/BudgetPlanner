@@ -258,9 +258,6 @@ export function render(root) {
 
   function draw(focusSel) {
     wrap.innerHTML = pageHtml(context());
-    wrap.querySelectorAll('input[type="month"]').forEach((el) => {
-      if (el.type !== "month") el.setAttribute("title", "YYYY-MM");
-    });
     if (focusSel) { const el = $(focusSel); if (el) el.focus(); }
   }
 
@@ -359,7 +356,7 @@ export function render(root) {
       setField(id, el.dataset.field, el.value);
       if (el.dataset.field === "mode") draw(`#g-${id}-${el.value === "custom" ? "monthly" : "target"}`);
       else refreshResult(id);
-    } else if (el.type === "month") {
+    } else if (el.tagName === "BP-DATE") {
       setField(id, el.dataset.field, el.value);
       draw(`#${el.id}`);
     } else if (el.tagName === "SELECT") {
