@@ -2,20 +2,90 @@
 import { noticeHtml } from "../components/notice.js";
 import { t, formatWhole as eur, formatCompact, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
+import { esc } from "../components/dom.js";
 import { currentMonth, duration } from "../components/format.js";
 import { mountChart, chartFigure, baseOptions } from "../components/chart.js";
 import { overspendHtml } from "../components/overspend.js";
 import * as store from "../store.js";
 import { monthsBetween } from "../calc/budget.js";
-import { inputFromState, prepare, project, loanMonths, RETIREMENT_AGE } from "../calc/projection.js";
+import { inputFromState, prepare, project, projectSavings, loanMonths, RETIREMENT_AGE } from "../calc/projection.js";
 
 export function render(root) {
   const wrap = document.createElement("div");
   root.appendChild(wrap);
   let unmount = [];
 
-  const head = `<div class="page-head"><h1>${t("overview.title")}</h1><p>${t("overview.intro")}</p>${noticeHtml()}</div>`;
+  const headFor = (savingsOnly) => `<div class="page-head"><h1>${t("overview.title")}</h1><p>${t(savingsOnly ? "overview.sv.intro" : "overview.intro")}</p>${noticeHtml()}</div>`;
+  const head = headFor(false);
   const prompt = (text, href, cta) => `${head}<section class="card soon-card"><p>${text}</p><a class="btn btn-primary" href="${href}">${cta}${icon("chevron-right")}</a></section>`;
+
+  /** The Financial Overview for someone who skips the House Planner: savings and goals from the budget alone. */
+  function drawSavings(s, inp, prep, today) {
+    const rs = projectSavings(inp, prep);
+    const units = s.house.units;
+    const infl = s.house.inflationPct;
+    const pick = (y) => (units === "today" ? y.real : y.nom);
+    const btn = (value, label) => `<button type="button" class="btn ${units === value ? "btn-primary" : ""}" data-units="${value}" aria-pressed="${units === value}">${label}</button>`;
+    const unitLabel = units === "today" ? t("house.c.unitsTodayShort") : t("house.c.unitsFutureShort");
+    const nowRow = rs.rows.find((x) => x.key >= today) || rs.rows[rs.rows.length - 1];
+    const last = rs.years[rs.years.length - 1];
+    const done = rs.reached.filter((g) => g.key <= today).length;
+    const next = rs.reached.find((g) => g.key > today);
+    const goalsSub = !rs.reached.length ? t("overview.sv.sGoalsNone") : next ? t("overview.sv.sGoalsNext", { name: esc(next.name), month: formatMonth(next.key) }) : t("overview.sv.sGoalsAll");
+    const range = rs.retireKey ? t("overview.sv.rangeAge", { retire: RETIREMENT_AGE, month: formatMonth(rs.endKey) }) : t("overview.sv.rangeAhead", { years: Math.round(monthsBetween(today, rs.endKey) / 12) });
+    const stats = `<dl class="stat-grid">
+      <div class="stat"><dt>${t("overview.sv.sFree")}</dt><dd>${eur(nowRow ? nowRow.leftover : 0)}</dd><dd class="sub">${t("overview.sv.sFreeSub")}</dd></div>
+      <div class="stat"><dt>${t("overview.sv.sSaved", { month: formatMonth(rs.endKey) })}</dt><dd>${eur(pick(last).netWorth)}</dd><dd class="sub">${t("overview.sv.sSavedSub")}</dd></div>
+      <div class="stat"><dt>${t("overview.sv.sGoals")}</dt><dd>${t("overview.sv.sGoalsVal", { done, total: rs.reached.length })}</dd><dd class="sub">${goalsSub}</dd></div>
+    </dl>`;
+    const rows = rs.years.map((y) => {
+      const v = pick(y);
+      return `<tr><th scope="row">${y.year}</th><td class="num">${eur(v.savings)}</td><td class="num">${eur(v.goalFunds)}</td><td class="num"><strong>${eur(v.netWorth)}</strong></td></tr>`;
+    }).join("");
+    const tableHtml = `<table class="data-table">
+      <thead><tr><th scope="col">${t("overview.colYear")}</th><th scope="col" class="num">${t("overview.sv.colSavings")}</th><th scope="col" class="num">${t("overview.sv.colGoals")}</th><th scope="col" class="num">${t("overview.sv.colTotal")}</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+    wrap.innerHTML = `
+      ${headFor(true)}
+      <div class="stack-lg">
+        <section class="card" aria-labelledby="ov-units">
+          <h2 id="ov-units">${t("house.units.title")}</h2>
+          <div class="row" role="group" aria-label="${t("house.units.show")}">${btn("future", t("house.units.future"))}${btn("today", t("house.units.today"))}</div>
+          <p class="small muted">${units === "today" ? t("house.c.unitsToday", { infl }) : t("house.c.unitsFuture")} <a href="#/house">${t("overview.changeInflation")}</a></p>
+        </section>
+        <section class="card" aria-labelledby="sv-now">
+          <h2 id="sv-now">${t("overview.sv.title")}</h2>
+          ${stats}
+          <p class="small muted">${range}</p>
+        </section>
+        <section class="card" aria-labelledby="ov-chart">
+          <h2 id="ov-chart">${t("overview.sv.chartTitle")}</h2>
+          ${chartFigure({ id: "ch-ov", title: t("overview.sv.chartCaption"), summary: t("overview.sv.chartSum", { unit: unitLabel }), tableLabel: "", tableHtml: null, height: 340 })}
+        </section>
+        <section class="card" aria-labelledby="ov-table">
+          <h2 id="ov-table">${t("overview.tableTitle")}</h2>
+          <p class="small muted">${t("overview.sv.tableNote", { unit: unitLabel })}</p>
+          <div class="table-scroll" role="region" tabindex="0" aria-label="${t("overview.tableTitle")}">${tableHtml}</div>
+        </section>
+        <div class="note">
+          ${icon("house", { size: 18 })}
+          <p><strong>${t("overview.sv.houseTitle")}</strong> ${t("overview.sv.houseText")} <a href="#/house">${t("overview.needHouseCta")}</a></p>
+        </div>
+      </div>`;
+    const money = (v) => formatCompact(v);
+    unmount.push(mountChart(wrap.querySelector("#ch-ov"), (th) => ({
+      type: "bar",
+      data: {
+        labels: rs.years.map((y) => String(y.year)),
+        datasets: [
+          { type: "bar", label: t("overview.sv.colSavings"), data: rs.years.map((y) => Math.round(pick(y).savings)), backgroundColor: th.bank, stack: "money", order: 2 },
+          { type: "bar", label: t("overview.sv.colGoals"), data: rs.years.map((y) => Math.round(pick(y).goalFunds)), backgroundColor: th.fund, stack: "money", order: 2 },
+          { type: "line", label: t("overview.sv.colTotal"), data: rs.years.map((y) => Math.round(pick(y).netWorth)), borderColor: th.text, backgroundColor: th.text, borderWidth: 3, pointStyle: "triangle", pointRadius: 4, order: 0 },
+        ],
+      },
+      options: baseOptions(th, money, { x: { stacked: true }, y: { stacked: true }, tip: eur }),
+    })));
+  }
 
   function draw() {
     unmount.forEach((fn) => fn());
@@ -26,12 +96,13 @@ export function render(root) {
     const inp = inputFromState(s, today);
     const prep = prepare(inp);
     const r = project(inp, prep);
-    if (r.fin.ok && r.problems.length) { // a plan that overspends is not shown: say what to cut instead
-      wrap.innerHTML = head + overspendHtml({ inp, prep, r, categories: s.categories });
+    if (r.problems.length) { // a plan that overspends is not shown: say what to cut instead
+      wrap.innerHTML = headFor(!r.fin.ok) + overspendHtml({ inp, prep, r, categories: s.categories });
       return;
     }
-    if (!r.fin.ok || !r.depositReady || !r.debtFree) {
-      const text = !r.fin.ok ? t("overview.needHouse") : !r.depositReady ? t("overview.noDeposit") : t("overview.noDebtFree");
+    if (!r.fin.ok) { drawSavings(s, inp, prep, today); return; } // no house plan: budget and goals only
+    if (!r.depositReady || !r.debtFree) {
+      const text = !r.depositReady ? t("overview.noDeposit") : t("overview.noDebtFree");
       wrap.innerHTML = prompt(text, "#/house", t("overview.needHouseCta"));
       return;
     }

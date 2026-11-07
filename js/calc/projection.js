@@ -362,6 +362,65 @@ export function project(inp, prep = prepare(inp)) {
   return out;
 }
 
+export const SAVINGS_YEARS = 10; // with no age entered, the savings view looks this far ahead
+
+/**
+ * The plan for someone who skips the House Planner: salary, expenses and goals only. Free money and the
+ * saved share of each bonus pile up as savings (no interest, no inflation); goals set money aside and spend
+ * it when reached. Runs until age 65 if the age is known, otherwise SAVINGS_YEARS from today.
+ * Returns year-end snapshots in future and today's euros, the months that overspend, and when each goal is reached.
+ */
+export function projectSavings(inp, prep = prepare(inp)) {
+  const { today, house, goals, bonusSharePct } = inp;
+  const endKey = inp.endKey || addMonths(today, SAVINGS_YEARS * 12);
+  const infl = house.inflationPct;
+  const bonusShare = Math.min(100, Math.max(0, bonusSharePct)) / 100;
+  const goalDefs = goals.map((g) => ({ g, plan: goalPlan(g) })).filter((x) => x.plan.valid);
+  const funds = new Map(goalDefs.map((x) => [x.g.id, 0]));
+  const out = {
+    start: inp.start, today, endKey, retireKey: inp.endKey || null, rows: [], years: [], problems: [], shortByMonth: {},
+    feasible: true, reached: [],
+  };
+  const flags = [];
+  let cash = 0;
+  for (let i = 0; i < prep.H; i++) {
+    const key = prep.keys[i];
+    if (key > endKey) break;
+    const { month } = parseMonth(key);
+    const salary = prep.salary[i];
+    const bm = BONUS_MONTHS[month];
+    const bonusSaved = bm ? salary * bm.multiple * bonusShare : 0;
+    let goalContrib = 0, ongoing = 0, payback = 0;
+    const replaced = new Set();
+    for (const { g, plan } of goalDefs) {
+      const c = goalContribution(plan, g, key);
+      goalContrib += c;
+      funds.set(g.id, funds.get(g.id) + c);
+      if (key >= plan.reach) { ongoing += g.ongoing || 0; funds.set(g.id, 0); if (g.replaces) replaced.add(g.replaces); }
+      if (g.paybackAmount > 0 && key === paybackMonth(plan)) payback += g.paybackAmount;
+    }
+    let removed = 0;
+    for (const c of replaced) { const k = prep.categoryIds.indexOf(c); if (k >= 0) removed += prep.amounts[i][k]; }
+    const leftover = salary - (prep.spend[i] - removed) - goalContrib - ongoing;
+    cash += leftover + bonusSaved + payback;
+    if (leftover < -EPS && key >= today) flags.push({ key, kind: "expenses", short: -leftover });
+    const goalFunds = [...funds.values()].reduce((a, b) => a + b, 0);
+    const row = { key, salary, leftover, savings: cash, goalFunds, netWorth: cash + goalFunds };
+    out.rows.push(row);
+    if (month === 12 || key === endKey) {
+      const f = todayFactor(today, key, infl);
+      const snap = (k) => ({ savings: row.savings * k, goalFunds: row.goalFunds * k, netWorth: row.netWorth * k });
+      out.years.push({ year: Number(key.slice(0, 4)), key, nom: snap(1), real: snap(f) });
+    }
+  }
+  out.reached = goalDefs.filter(({ plan }) => plan.reach <= endKey).map(({ g, plan }) => ({ name: g.name, key: plan.reach, amount: g.amount }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+  out.problems = groupProblems(flags);
+  out.shortByMonth = shortMap(flags);
+  out.feasible = flags.length === 0;
+  return out;
+}
+
 /** Affordability and installment figures for Stage B, independent of when the house is bought. */
 export function loanFigures(house, fin, netSalary) {
   if (!fin.ok) return null;

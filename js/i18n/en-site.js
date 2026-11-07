@@ -16,16 +16,17 @@ export default {
   welcome: {
     eyebrow: "For salaried employees in Greece",
     title: "Plan your month, your goals and your first home",
-    lead: "Enter your net salary and expenses and see when you can afford the deposit, what the loan costs and the month you could be debt-free. It takes a few minutes and needs no account.",
+    lead: "Three tools that work on their own or together. Start with your monthly budget, add goals when you are ready, and plan a house purchase only if you want one. It takes a few minutes and needs no account.",
     ctaNew: "Start planning",
     ctaBack: "Open your roadmap",
     trust: ["No account and no sign-up", "Your data never leaves your browser", "Free to use"],
     heroAlt: "The Financial Overview page, showing savings, investments, the home and the loan year by year.",
     howTitle: "How it works",
+    stepsNote: "Use one, two or all three. Goals and the House Planner build on your monthly budget, and neither needs the other.",
     steps: [
-      { t: "Set up your month", d: "Enter your net monthly salary and your usual expenses. See what is left over each month." },
-      { t: "Add your goals", d: "A wedding, a car, a holiday. Each goal shows how it changes your free money and your deposit date." },
-      { t: "Plan the house", d: "Enter a price or a loan. The planner sizes the deposit and the loan, then follows the investments until you are debt-free." },
+      { t: "Monthly Budget: start here", d: "Enter your net monthly salary and your usual expenses. See what is left over each month." },
+      { t: "Goals: optional", d: "A wedding, a car, a holiday. Each goal shows how it changes your free money, and your deposit date if you plan a house." },
+      { t: "House Planner: optional", d: "Planning to buy? Enter a price or a loan. The planner sizes the deposit and the loan, then follows the investments until you are debt-free." },
     ],
     featuresTitle: "What you get",
     sampleNote: "The screenshots use sample numbers, not real people's data.",
@@ -44,7 +45,7 @@ export default {
       },
       {
         t: "One timeline from today to debt-free",
-        d: "Your roadmap puts goals, life events, the deposit date, the purchase and the debt-free month on a single line. Every step opens the page where you can change it.",
+        d: "Your roadmap puts your goals and life events on a single line. With a house plan it adds the deposit date, the purchase and the debt-free month. Every step opens the page where you can change it.",
         img: "home",
         alt: "The roadmap showing goals, the deposit date, the house purchase and the debt-free date.",
       },
@@ -52,7 +53,7 @@ export default {
     whoTitle: "Who it is for",
     whoYes: [
       "You work for a private company with a known, exact net monthly salary, paid as 14 salaries a year.",
-      "You are buying your first home and have no other property or assets that affect your taxes.",
+      "For the House Planner: you are buying your first home and have no other property or assets that affect your taxes.",
     ],
     whoNo: "Not covered: self-employed people and freelancers. The site does no tax calculations: you enter your net salary and it is taken as given.",
     privacyTitle: "Private by design",
@@ -60,6 +61,7 @@ export default {
     privacyLink: "Read the privacy policy",
     faqTitle: "Questions",
     faq: [
+      { q: "Do I have to plan a house?", a: "No. The Monthly Budget and Goals work on their own, and the Financial Overview then shows your savings and goals. Add the House Planner only if you are buying a home." },
       { q: "Is it really free?", a: "Yes, you can use every page without paying or signing up." },
       { q: "Where is my data stored?", a: "Only in this browser on this device. If you clear your browser data you lose it, so use Export backup in the footer to keep a copy." },
       { q: "Does it calculate my taxes?", a: "No. You enter your net salary and it is used as given. The only tax figures are editable assumptions, for example tax on investment gains." },

@@ -1,5 +1,6 @@
 // Sample saved data for tests and for tests/seed.html. Months are relative to today so the plan always
 // starts "now". Variants: "empty" (budget only), "basic" (plus a house price), "full" (goals, steps, events, support),
+// "goals" (budget and approved goals, no house: the House Planner is skipped),
 // "short" (a house too dear for the salary: the plan overspends once the installment starts).
 export function buildSample(variant = "full", { theme = "system", now = new Date() } = {}) {
   const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -20,7 +21,13 @@ export function buildSample(variant = "full", { theme = "system", now = new Date
     goals: [],
     house: {},
   };
-  if (variant !== "empty") state.house = { mode: "price", amount: variant === "short" ? 300000 : 150000, ltvPct: 80, costsPct: 7, buffer: 5000 };
+  if (variant !== "empty" && variant !== "goals") state.house = { mode: "price", amount: variant === "short" ? 300000 : 150000, ltvPct: 80, costsPct: 7, buffer: 5000 };
+  if (variant === "goals") {
+    state.goals = [
+      { id: "car", approved: true, draft: null, data: { name: "Dream Car", start: plus(3), target: plus(15), amount: 3600, mode: "auto", monthly: null, ongoing: 90, paybackAmount: 0, paybackTo: "deposit", replaces: "transport" } },
+      { id: "wed", approved: true, draft: null, data: { name: "Wedding", start: plus(12), target: plus(36), amount: 9600, mode: "auto", monthly: null, ongoing: 0, paybackAmount: 3000, paybackTo: "deposit" } },
+    ];
+  }
   if (variant === "full") {
     state.goals = [
       { id: "car", approved: true, draft: null, data: { name: "Dream Car", start: plus(3), target: plus(15), amount: 3600, mode: "auto", monthly: null, ongoing: 90, paybackAmount: 0, paybackTo: "deposit", replaces: "transport" } },

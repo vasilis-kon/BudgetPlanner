@@ -43,7 +43,7 @@ function check(name, variant, expectations) {
   }
 }
 
-for (const variant of ["empty", "basic", "full", "short"]) {
+for (const variant of ["empty", "goals", "basic", "full", "short"]) {
   for (const name of Object.keys(PAGES)) {
     const expect = {};
     if (name === "home" && variant === "full") {
@@ -74,7 +74,7 @@ for (const variant of ["empty", "basic", "full", "short"]) {
       expect["welcome shows the right call to action"] = (o) => o.text.includes("Open your roadmap") && !o.text.includes("Start planning");
       expect["welcome has a how-it-works list of 3 steps"] = (o) => o.root.querySelectorAll(".how li").length === 3;
       expect["every screenshot has alt text, a size and a file"] = (o) => [...o.root.querySelectorAll("img.shot")].length === 4 && [...o.root.querySelectorAll("img.shot")].every((i) => i.alt.length > 20 && i.width && i.height && /assets\/screens\/\w+\.webp$/.test(i.getAttribute("src")));
-      expect["welcome has FAQ and privacy link"] = (o) => o.root.querySelectorAll("details").length === 4 && !!o.root.querySelector('a[href="#/privacy"]');
+      expect["welcome has FAQ and privacy link"] = (o) => o.root.querySelectorAll("details").length === 5 && !!o.root.querySelector('a[href="#/privacy"]');
     }
     if (name === "privacy") {
       expect["privacy says nothing leaves the device"] = (o) => o.text.includes("never sent to us") && o.text.includes("no analytics");
@@ -98,6 +98,15 @@ for (const variant of ["empty", "basic", "full", "short"]) {
     if ((variant === "full" || variant === "basic") && ["house", "overview", "home"].includes(name)) {
       expect["page carries the not-advice notice with a date"] = (o) => !!o.root.querySelector(".notice") && o.text.includes("not financial advice") && o.text.includes("7 November 2026");
     }
+    if (name === "overview" && (variant === "empty" || variant === "goals")) {
+      expect["no house: the overview shows savings, not a dead prompt"] = (o) => !o.root.querySelector(".soon-card") && o.text.includes("Your savings") && !!o.root.querySelector("canvas") && o.root.querySelectorAll(".data-table tbody tr").length >= 10;
+      expect["no house: the page says the House Planner is optional"] = (o) => o.text.includes("The House Planner is optional");
+    }
+    if (name === "overview" && variant === "goals") expect["no house: goals are counted"] = (o) => o.text.includes("0 of 2") && o.text.includes("Next: Dream Car");
+    if (name === "overview" && (variant === "basic" || variant === "full")) expect["with a house the full overview still shows"] = (o) => !o.text.includes("Your savings") && o.text.includes("Net worth");
+    if (name === "home" && (variant === "empty" || variant === "goals")) expect["no house: the roadmap treats the house as optional"] = (o) => o.text.includes("The House Planner is optional");
+    if (name === "home" && variant === "goals") expect["no house: goals still show on the roadmap"] = (o) => o.text.includes("Dream Car") && o.text.includes("Wedding");
+    if (name === "goals" && variant === "goals") expect["goals work without a house"] = (o) => o.text.includes("Dream Car") && o.text.includes("Not planning a house?");
     if (name === "home" && variant === "empty") expect["who this is for note shows"] = (o) => o.text.includes("Who this is for");
     if (name === "goals" && variant === "full") {
       expect["both approved goals and the draft show"] = (o) => o.text.includes("Dream Car") && o.text.includes("Big trip");

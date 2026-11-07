@@ -3,7 +3,7 @@
 import { addMonths, monthsBetween, summarizeMonth } from "../js/calc/budget.js";
 import { pmt, createLoan, loanSummary, affordability, loanForPayment } from "../js/calc/loan.js";
 import { goalPlan, goalContribution, goalLinesFor, checkGoal, approvedGoals, replacedCategories, budgetFreeFn } from "../js/calc/goals.js";
-import { prepare, project, houseFinance, inputFromState, supportSweep, loanMonths, todayFactor, newShortfalls, cutAdvice, isFlexible, monthPicture, plannedDetail } from "../js/calc/projection.js";
+import { prepare, project, projectSavings, houseFinance, inputFromState, supportSweep, loanMonths, todayFactor, newShortfalls, cutAdvice, isFlexible, monthPicture, plannedDetail } from "../js/calc/projection.js";
 import { emptyState, sanitize, defaultHouse, goalFields } from "../js/store.js";
 
 const results = [];
@@ -718,6 +718,41 @@ const lookup = (path) => path.split(".").reduce((o, k) => (o == null ? o : o[k])
   for (const k of ["rent", "groceries", "utilities", "transport", "health", "eating", "subscriptions", "leisure", "clothing", "other"]) if (lookup("cat." + k) === undefined) missing.push("cat." + k);
   results.push({ name: "every interface-text key used in the code exists in en.js", ok: missing.length === 0, msg: "missing: " + missing.join(", ") });
 }
+
+/* ---------- savings view (no House Planner) ---------- */
+const noHouse = (over = {}) => { const st = baseState(over); st.house.amount = null; return st; };
+const savings = (st) => { const inp = inputFromState(st, TODAY); return projectSavings(inp, prepare(inp)); };
+test("savings view: free money and the saved half of each bonus add up (no house)", () => {
+  const rs = savings(noHouse());
+  // 2000 - 600 - 300 = 1100 a month. Nov and Dec 2026 = 2200, plus half the Christmas bonus (2000 x 1 x 50%) = 1000.
+  near(rs.years[0].nom.savings, 3200, 0.01, "end of 2026");
+  // 2027: 12 x 1100 = 13200, plus half of Easter, summer and Christmas bonuses (0.5 + 0.5 + 1) x 2000 x 50% = 2000.
+  near(rs.years[1].nom.savings, 3200 + 15200, 0.01, "end of 2027");
+  eq(rs.years[0].year, 2026); eq(rs.years.length, 11, "years shown"); eq(rs.years.at(-1).key, "2036-11");
+  is(rs.feasible && rs.problems.length === 0, "a salary that covers the costs is feasible");
+});
+test("savings view: a goal moves money aside without changing the total, and is reached on time", () => {
+  const goal = { id: "g1", approved: true, draft: null, data: { name: "Trip", start: "2027-01", target: "2028-01", amount: 3600, mode: "auto", monthly: null, ongoing: 0, paybackAmount: 0, paybackTo: "deposit" } };
+  const rs = savings(noHouse({ goals: [goal] }));
+  const y27 = rs.years.find((y) => y.year === 2027);
+  near(y27.nom.goalFunds, 3600, 0.01, "set aside by the end of 2027");
+  near(y27.nom.netWorth, 3200 + 15200, 0.01, "total is unchanged by setting money aside");
+  near(y27.nom.savings, 3200 + 15200 - 3600, 0.01, "savings are lower by what is set aside");
+  eq(rs.reached.length, 1); eq(rs.reached[0].key, "2028-01");
+  near(rs.years.find((y) => y.year === 2028).nom.goalFunds, 0, 1e-9, "the money is spent when the goal is reached");
+});
+test("savings view: overspending is flagged, and the age sets the end of the view", () => {
+  const rs = savings(noHouse({ salary: [{ from: TODAY, amount: 800 }] }));
+  is(!rs.feasible && rs.problems.length === 1, "a salary below the costs is flagged");
+  const st = noHouse(); st.house.age = 30;
+  const old = savings(st);
+  eq(old.endKey, addMonths(TODAY, 35 * 12), "runs until 65");
+  eq(old.retireKey, old.endKey);
+});
+test("savings view: today's euros are smaller than future euros", () => {
+  const y = savings(noHouse()).years.at(-1);
+  is(y.real.netWorth < y.nom.netWorth, "deflated total is smaller");
+});
 
 /* ---------- report ---------- */
 const failed = results.filter((r) => !r.ok);
