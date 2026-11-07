@@ -14,7 +14,7 @@ body {
   flex-direction: column;
 }
 
-h1, h2, h3 { line-height: 1.25; margin: 0 0 var(--space-3); font-weight: 650; }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 var(--space-3); font-weight: 750; letter-spacing: -0.01em; }
 h1 { font-size: var(--text-2xl); }
 h2 { font-size: var(--text-xl); }
 h3 { font-size: var(--text-lg); }
