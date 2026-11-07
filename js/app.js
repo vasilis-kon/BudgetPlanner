@@ -40,20 +40,41 @@ function renderHeader() {
         </button>
       </div>
     </div>`;
-  $("menu-toggle").addEventListener("click", () => setMenu(!$("main-nav").classList.contains("open")));
+  $("menu-toggle").addEventListener("click", () => {
+    if (wide.matches) setCollapsed(!document.documentElement.classList.contains("nav-collapsed"));
+    else setMenu(!$("main-nav").classList.contains("open"));
+  });
   $("main-nav").addEventListener("click", (e) => { if (e.target.closest("a")) setMenu(false); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && $("main-nav").classList.contains("open")) { setMenu(false); $("menu-toggle").focus(); }
   });
+  wide.addEventListener("change", () => { setMenu(false); syncToggle(); });
   $("theme-toggle").addEventListener("click", toggleTheme);
   updateThemeButton();
+  syncToggle();
 }
+
+// Wide screens: a sidebar that can shrink to an icon rail (remembered). Narrow screens: a slide-in drawer.
+const wide = matchMedia("(min-width: 64rem)");
 
 function setMenu(open) {
   $("main-nav").classList.toggle("open", open);
+  syncToggle();
+}
+
+function setCollapsed(collapsed) {
+  document.documentElement.classList.toggle("nav-collapsed", collapsed);
+  try { localStorage.setItem("bp-nav-collapsed", collapsed ? "1" : "0"); } catch (e) {}
+  syncToggle();
+}
+
+function syncToggle() {
   const btn = $("menu-toggle");
-  btn.setAttribute("aria-expanded", String(open));
-  btn.querySelector("svg").outerHTML = icon(open ? "x" : "menu");
+  const expanded = wide.matches
+    ? !document.documentElement.classList.contains("nav-collapsed")
+    : $("main-nav").classList.contains("open");
+  btn.setAttribute("aria-expanded", String(expanded));
+  btn.querySelector("svg").outerHTML = icon(wide.matches ? (expanded ? "chevron-left" : "menu") : (expanded ? "x" : "menu"));
 }
 
 function isDark() {

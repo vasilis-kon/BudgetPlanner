@@ -13,6 +13,7 @@
       var s = JSON.parse(localStorage.getItem("budgetplanner:v1") || "null");
       var th = s && s.settings && s.settings.theme;
       if (th === "light" || th === "dark") document.documentElement.setAttribute("data-theme", th);
+      if (localStorage.getItem("bp-nav-collapsed") === "1") document.documentElement.classList.add("nav-collapsed");
     } catch (e) {}
   </script>
   <link rel="stylesheet" href="css/tokens.css">

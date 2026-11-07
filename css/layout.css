@@ -1,41 +1,67 @@
 /* Page frame, header, navigation, grids. Mobile first; wider screens add columns. */
+/* Narrow screens: slim top bar with a slide-in drawer. Wide screens: left sidebar. */
+:root { --header-h: calc(3.75rem + 3px); --side-w: 15rem; --rail-w: 4.5rem; }
 .site-header {
   background: var(--header-bg); color: var(--header-text);
   border-bottom: 3px solid var(--primary);
   position: sticky; top: 0; z-index: 20;
 }
 .header-inner {
-  max-width: var(--max-width); margin: 0 auto;
   padding: var(--space-2) var(--space-4);
   display: flex; align-items: center; gap: var(--space-3);
-  flex-wrap: wrap;
 }
 .brand {
   display: inline-flex; align-items: center; gap: var(--space-2);
   font-weight: 750; font-size: var(--text-lg); color: var(--header-text); text-decoration: none;
   min-height: var(--tap);
 }
-.brand .icon { color: #8fb0ff; }
+.brand .icon { color: #8fb0ff; flex: none; }
 .header-actions { margin-left: auto; display: flex; gap: var(--space-2); }
 
-.main-nav { flex-basis: 100%; display: none; }
-.main-nav.open { display: block; }
-.main-nav ul { list-style: none; margin: 0; padding: 0 0 var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
+.main-nav {
+  position: fixed; top: var(--header-h); bottom: 0; left: 0; z-index: 19;
+  width: min(18rem, 85vw); overflow-y: auto;
+  background: var(--header-bg); border-right: 1px solid var(--header-hover);
+  padding: var(--space-3);
+  transform: translateX(-100%); visibility: hidden;
+  transition: transform var(--ease), visibility var(--ease);
+}
+.main-nav.open { transform: none; visibility: visible; }
+.main-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .main-nav a {
   display: flex; align-items: center; gap: var(--space-3);
   min-height: var(--tap); padding: 0 var(--space-3);
   border-radius: var(--radius-sm); color: var(--header-text); text-decoration: none; font-weight: 500;
+  border-left: 3px solid transparent;
 }
 .main-nav a:hover { background: var(--header-hover); }
-.main-nav a[aria-current="page"] { background: var(--primary); color: #ffffff; font-weight: 650; }
+.main-nav a[aria-current="page"] { background: var(--primary); color: #ffffff; font-weight: 650; border-left-color: #8fb0ff; }
 .menu-toggle { display: inline-flex; }
 
-@media (min-width: 56rem) {
-  .header-actions .menu-toggle { display: none; }
-  .main-nav { display: block; flex-basis: auto; order: 2; margin-left: var(--space-4); }
-  .main-nav ul { flex-direction: row; padding: 0; }
-  .main-nav a { padding: 0 var(--space-3); }
-  .header-actions { order: 3; }
+@media (min-width: 64rem) {
+  body { padding-left: var(--side-w); }
+  .site-header {
+    position: fixed; top: 0; left: 0; bottom: 0; width: var(--side-w); z-index: 20;
+    border-bottom: 0; border-right: 3px solid var(--primary);
+    overflow-y: auto;
+  }
+  .header-inner { height: 100%; flex-direction: column; align-items: stretch; gap: var(--space-4); padding: var(--space-4) var(--space-3); }
+  .main-nav {
+    position: static; transform: none; visibility: visible; transition: none;
+    width: auto; flex: 1; padding: 0; border: 0; overflow: visible;
+  }
+  .header-actions { margin-left: 0; justify-content: space-between; }
+  .brand { padding: 0 var(--space-3); }
+
+  .nav-collapsed body { padding-left: var(--rail-w); }
+  .nav-collapsed .site-header { width: var(--rail-w); }
+  .nav-collapsed .brand span,
+  .nav-collapsed .main-nav a span,
+  .nav-collapsed .menu-toggle span {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .nav-collapsed .brand, .nav-collapsed .main-nav a { justify-content: center; padding: 0; }
+  .nav-collapsed .header-actions { flex-direction: column; align-items: center; }
 }
 
 main {
@@ -61,3 +87,6 @@ main {
   display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between;
 }
 .footer-inner p { margin: 0; }
+
+.site-header .btn-quiet { color: var(--header-text); }
+.site-header .btn-quiet:hover { background: var(--header-hover); }
