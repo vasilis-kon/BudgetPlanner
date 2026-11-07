@@ -692,6 +692,25 @@ test("tracker: editing a row updates the totals, and the comparison reads the ba
   is(cmp("Eating out").textContent.includes("€375"), "eating out now has 340 + 35");
   eq(store.getState().months[firstMonth()].items.find((i) => i.name === "Supermarket").catId, "eating", "saved");
 });
+test("tracker: a goal in place adds its monthly amount as a fixed cost to the baseline and to what is spent, and the difference stays", () => {
+  const st = buildSample("goals");
+  st.goals = [{ id: "g1", approved: true, draft: null, data: { name: "Trip", start: plus(0), target: plus(12), amount: 3600, mode: "auto", monthly: null, ongoing: 0, paybackAmount: 0, paybackTo: "deposit", replaces: null } }];
+  localStorage.setItem(store.STORAGE_KEY, JSON.stringify(st)); store.load();
+  setSelected(null); stage.innerHTML = ""; tracker.render(stage);
+  const fixed = $$(".compare tr.fixed");
+  eq(fixed.length, 1, "one fixed row");
+  is(fixed[0].textContent.includes("Trip") && fixed[0].textContent.includes("€300") && fixed[0].textContent.includes("Monthly amount for this goal"), "the goal row: " + fixed[0].textContent);
+  const stats = $("#stats").textContent;
+  is(stats.includes("€1,600"), "baseline = 1,300 of categories + 300 for the goal: " + stats);
+  is(stats.includes("€577.40"), "spent = 277.40 of purchases + 300 for the goal: " + stats);
+  is(stats.includes("€1,022.60"), "what is left is unchanged by a fixed cost that is paid as planned: " + stats);
+  is(stats.includes("fixed costs"), "the card says where the extra comes from");
+  eq($("#list-total").textContent, "€277.40", "the purchase list still totals only purchases");
+});
+test("tracker: with no goal in place there are no fixed rows", () => {
+  start("basic", tracker);
+  eq($$(".compare tr.fixed").length, 0);
+});
 test("tracker: deleting a row takes it out of the saved data and the totals", () => {
   start("basic", tracker);
   rowsOf()[0].querySelector('[data-action="remove"]').click();

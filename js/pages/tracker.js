@@ -53,9 +53,21 @@ export function render(root) {
       const spent = actualFor(st.months, c.id, selected) || 0;
       return { c, base, spent, diff: spent - base };
     });
-    const base = rows.reduce((a, r) => a + r.base, 0);
-    const spent = rows.reduce((a, r) => a + r.spent, 0);
-    return { rows, base, spent, diff: spent - base, count: itemsFor(st.months, selected).length };
+    // Fixed costs run on their own every month and are paid as planned: the monthly amount of each goal in place (and its
+    // ongoing costs) and, once the house is bought, the installment and home running costs. The Budget Plan takes them off
+    // free money too, so they count here as both planned and spent.
+    const fixed = [
+      ...pic.goalLines.lines.map((l) => ({ id: `${l.kind}-${l.id}`, name: l.name, amount: l.amount, icon: l.kind === "goal" ? "target" : "wrench", note: t(l.kind === "goal" ? "tracker.compare.fixedGoal" : "tracker.compare.fixedOngoing") })),
+      ...(pic.house ? [
+        ...(pic.house.installment > EPS ? [{ id: "installment", name: t("budget.home.installment"), amount: pic.house.installment, icon: "landmark", note: t("tracker.compare.fixedHome") }] : []),
+        { id: "home-costs", name: t("budget.home.running"), amount: pic.house.homeCosts, icon: "house", note: t("tracker.compare.fixedHome") },
+      ] : []),
+    ].filter((f) => f.amount > EPS);
+    const fixedTotal = fixed.reduce((a, f) => a + f.amount, 0);
+    const base = rows.reduce((a, r) => a + r.base, 0) + fixedTotal;
+    const purchases = rows.reduce((a, r) => a + r.spent, 0);
+    const spent = purchases + fixedTotal;
+    return { rows, fixed, fixedTotal, purchases, base, spent, diff: spent - base, count: itemsFor(st.months, selected).length };
   }
 
   const diffHtml = (d) => {
@@ -73,12 +85,13 @@ export function render(root) {
 
   function statsHtml(tot) {
     const cls = tot.diff > EPS ? "negative" : tot.diff < -EPS ? "positive" : "zero";
-    const sub = tot.count === 0 ? t("tracker.stat.spentSubNone") : tot.count === 1 ? t("tracker.stat.spentSubOne") : t("tracker.stat.spentSub", { count: tot.count });
+    const sub = (tot.count === 0 ? t("tracker.stat.spentSubNone") : tot.count === 1 ? t("tracker.stat.spentSubOne") : t("tracker.stat.spentSub", { count: tot.count }))
+      + (tot.fixedTotal > EPS ? " · " + t("tracker.stat.fixedSub", { amount: eur(tot.fixedTotal) }) : "");
     const label = cls === "negative" ? t("tracker.stat.over") : t("tracker.stat.left");
     const note = cls === "negative" ? t("tracker.stat.overSub") : cls === "zero" ? t("tracker.stat.zeroSub") : t("tracker.stat.leftSub");
     return `
       <section class="card" aria-labelledby="stat-spent-l"><p class="stat-label" id="stat-spent-l">${t("tracker.stat.spent", { month: formatMonth(selected) })}</p><p class="stat-value">${eur(tot.spent)}</p><p class="stat-sub">${sub}</p></section>
-      <section class="card" aria-labelledby="stat-base-l"><p class="stat-label" id="stat-base-l">${t("tracker.stat.baseline", { month: formatMonth(selected) })}</p><p class="stat-value">${eur(tot.base)}</p><p class="stat-sub">${t("tracker.stat.baselineSub")}</p></section>
+      <section class="card" aria-labelledby="stat-base-l"><p class="stat-label" id="stat-base-l">${t("tracker.stat.baseline", { month: formatMonth(selected) })}</p><p class="stat-value">${eur(tot.base)}</p><p class="stat-sub">${t(tot.fixedTotal > EPS ? "tracker.stat.baselineSubFixed" : "tracker.stat.baselineSub")}</p></section>
       <section class="card free-card ${cls}" aria-labelledby="stat-left-l"><p class="stat-label" id="stat-left-l">${label}</p><p class="stat-value">${eur(Math.abs(tot.diff))}</p><p class="stat-sub" role="status">${note}</p></section>`;
   }
 
@@ -133,7 +146,7 @@ export function render(root) {
             <th scope="col"><span class="visually-hidden">${t("tracker.list.remove")}</span></th>
           </tr></thead>
           <tbody>${addRowHtml()}${items.map((it, i) => rowHtml(it, i + 1)).join("")}</tbody>
-          <tfoot><tr><th scope="row" colspan="4">${t("tracker.list.total")}</th><td class="num" id="list-total">${eur(tot.spent)}</td><td></td></tr></tfoot>
+          <tfoot><tr><th scope="row" colspan="4">${t("tracker.list.total")}</th><td class="num" id="list-total">${eur(tot.purchases)}</td><td></td></tr></tfoot>
         </table>
       </div>
       ${items.length ? "" : `<p class="small muted" id="list-empty">${t("tracker.list.empty")}</p>`}`;
@@ -154,6 +167,14 @@ export function render(root) {
           <td class="num" data-label="${t("tracker.compare.used")}">${used}</td>
         </tr>`;
     }).join("");
+    const fixedRows = tot.fixed.map((f) => `
+        <tr class="fixed">
+          <th scope="row"><span class="cat"><span class="cat-icon">${icon(f.icon)}</span>${esc(f.name)}</span><span class="cat-note">${f.note}</span></th>
+          <td class="num" data-label="${t("tracker.compare.baseline")}">${eur(f.amount)}</td>
+          <td class="num" data-label="${t("tracker.compare.spent")}">${eur(f.amount)}</td>
+          <td class="num" data-label="${t("tracker.compare.difference")}">${diffHtml(0)}</td>
+          <td class="num" data-label="${t("tracker.compare.used")}"><span class="muted small">${t("tracker.compare.fixedUsed")}</span></td>
+        </tr>`).join("");
     return `
       <h2 id="compare-h">${t("tracker.compare.title")}</h2>
       <p class="muted">${t("tracker.compare.intro", { month: formatMonth(selected) })}</p>
@@ -167,7 +188,7 @@ export function render(root) {
             <th scope="col" class="num">${t("tracker.compare.difference")}</th>
             <th scope="col" class="num">${t("tracker.compare.used")}</th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody>${rows}${fixedRows}</tbody>
           <tfoot><tr>
             <th scope="row">${t("tracker.compare.total")}</th>
             <td class="num">${eur(tot.base)}</td><td class="num">${eur(tot.spent)}</td><td class="num">${diffHtml(tot.diff)}</td><td></td>
@@ -218,7 +239,7 @@ export function render(root) {
   function refresh() {
     const tot = totals();
     $("#stats").innerHTML = statsHtml(tot);
-    $("#list-total").textContent = eur(tot.spent);
+    $("#list-total").textContent = eur(tot.purchases);
     $("#compare-card").innerHTML = compareHtml(tot);
     const empty = $("#list-empty");
     if (empty) empty.remove();
