@@ -6,3 +6,8 @@ import { SITE } from "../config.js";
 export function noticeHtml() {
   return `<div class="note notice">${icon("info", { size: 18 })}<p>${t("notice.text", { date: formatDay(SITE.assumptionsUpdated) })} <a href="#/disclaimer">${t("notice.link")}</a></p></div>`;
 }
+
+/** Explains "debt-free status" wherever the plan reaches it. */
+export function debtFreeNoteHtml() {
+  return `<div class="note">${icon("badge-check", { size: 18 })}<p><strong>${t("debtFreeNote.title")}</strong> ${t("debtFreeNote.text")}</p></div>`;
+}

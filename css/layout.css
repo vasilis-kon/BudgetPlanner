@@ -7,8 +7,8 @@
   position: sticky; top: 0; z-index: 20;
 }
 .header-inner {
-  padding: var(--space-2) var(--space-4);
-  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  display: flex; align-items: center; gap: var(--space-2);
 }
 .brand {
   display: inline-flex; align-items: center; gap: var(--space-2);
@@ -16,7 +16,14 @@
   min-height: var(--tap);
 }
 .brand .icon { color: #90caf9; flex: none; }
-.header-actions { margin-left: auto; display: flex; gap: var(--space-2); }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-1); }
+.lang-switch { display: inline-flex; border: 1px solid var(--header-text); border-radius: var(--radius-sm); overflow: hidden; }
+.lang-btn {
+  min-height: var(--tap); min-width: 2.25rem; padding: 0 var(--space-2); border: 0; background: transparent;
+  color: var(--header-text); font: inherit; font-size: var(--text-sm); font-weight: 650; cursor: pointer;
+}
+.lang-btn:hover { background: var(--header-hover); }
+.lang-btn[aria-pressed="true"] { background: var(--header-text); color: var(--header-bg); }
 
 .main-nav {
   position: fixed; top: var(--header-h); bottom: 0; left: 0; z-index: 19;
@@ -67,6 +74,7 @@
   }
   .nav-collapsed .brand, .nav-collapsed .main-nav a { justify-content: center; padding: 0; }
   .nav-collapsed .header-actions { flex-direction: column; align-items: center; }
+  .nav-collapsed .lang-switch { flex-direction: column; }
 }
 
 /* Name tag shown next to an icon of the collapsed sidebar while it is pointed at or focused. */
@@ -90,7 +98,7 @@ main {
 .grid { display: grid; gap: var(--space-4); }
 .grid-2 { grid-template-columns: 1fr; }
 .grid-3 { grid-template-columns: 1fr; }
-@media (min-width: 40rem) { .grid-3 { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 40rem) { .grid-3 { grid-template-columns: repeat(3, 1fr); } .grid-2-always { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 56rem) { .grid-2 { grid-template-columns: 1fr 1fr; } }
 .stack > * + * { margin-top: var(--space-4); }
 .stack-lg > * + * { margin-top: var(--space-5); }

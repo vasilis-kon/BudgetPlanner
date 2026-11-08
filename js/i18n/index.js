@@ -1,8 +1,25 @@
 // Picks the language file and gives pages one helper: t("budget.title", { name: "x" }).
-// To add Greek later: create el.js with the same keys and choose it below.
-import en from "./en.js";
+// The language is chosen once, when the page loads: a saved choice, otherwise the browser's language.
+// Switching language stores the choice and reloads the page, so every text and number format is rebuilt.
+export const LANGS = ["en", "el"];
+const LANG_KEY = "bp-lang";
 
-const dict = en;
+function pickLang() {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (LANGS.includes(saved)) return saved;
+  } catch (e) {}
+  return String(navigator.language || "").toLowerCase().startsWith("el") ? "el" : "en";
+}
+
+export const lang = pickLang();
+export function setLang(next) {
+  if (!LANGS.includes(next) || next === lang) return;
+  try { localStorage.setItem(LANG_KEY, next); } catch (e) {}
+  location.reload();
+}
+
+const dict = (await import(lang === "el" ? "./el.js" : "./en.js")).default;
 
 export function t(path, vars = {}) {
   let v = path.split(".").reduce((o, k) => (o == null ? o : o[k]), dict);
@@ -11,7 +28,7 @@ export function t(path, vars = {}) {
   return v.replace(/\{(\w+)\}/g, (_, k) => (vars[k] == null ? `{${k}}` : vars[k]));
 }
 
-const LOCALE = "en-GB";
+const LOCALE = lang === "el" ? "el-GR" : "en-GB";
 
 const money = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 2 });
 export const formatMoney = (n) => money.format(Math.abs(n) < 0.005 ? 0 : n);
@@ -28,7 +45,9 @@ const monthFmt = new Intl.DateTimeFormat(LOCALE, { month: "long", year: "numeric
 const monthShortFmt = new Intl.DateTimeFormat(LOCALE, { month: "short", timeZone: "UTC" });
 export function formatMonth(key) {
   const [y, m] = key.split("-").map(Number);
-  return monthFmt.format(new Date(Date.UTC(y, m - 1, 1)));
+  const text = monthFmt.format(new Date(Date.UTC(y, m - 1, 1)));
+  // Greek month names come out in the nominative ("Νοέμβριος"), but sentences need the accusative ("τον Νοέμβριο").
+  return lang === "el" ? text.replace(/ος(?=\s|$)/, "ο") : text;
 }
 export function formatMonthShort(key) {
   const [y, m] = key.split("-").map(Number);

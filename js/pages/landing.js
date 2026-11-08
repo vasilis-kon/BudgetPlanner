@@ -31,7 +31,7 @@ export function render(root) {
       <section aria-labelledby="how-h">
         <h2 id="how-h">${t("welcome.howTitle")}</h2>
         <p class="muted">${t("welcome.stepsNote")}</p>
-        <ol class="grid grid-3 how">
+        <ol class="grid grid-2-always how">
           ${t("welcome.steps").map((s, i) => `<li class="card"><span class="how-n" aria-hidden="true">${i + 1}</span><h3>${s.t}</h3><p>${s.d}</p></li>`).join("")}
         </ol>
       </section>

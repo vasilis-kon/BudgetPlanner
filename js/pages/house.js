@@ -1,6 +1,6 @@
 // Page 3: House Planner. Your expected future, then Stage A (save the deposit), Stage B (size the loan)
 // and Stage C (invest and become debt-free). Every number comes from the user; the site adds none.
-import { noticeHtml } from "../components/notice.js";
+import { noticeHtml, debtFreeNoteHtml } from "../components/notice.js";
 import { t, formatMoney as eurc, formatWhole as eur, formatCompact, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
 import { esc, parseAmount } from "../components/dom.js";
@@ -368,6 +368,7 @@ export function render(root) {
       <section class="card" aria-labelledby="c-h">
         <div class="card-head">${icon("trending-up")}<h2 id="c-h">${t("house.c.title")}</h2></div>
         <p class="muted">${t("house.c.intro")}</p>
+        ${debtFreeNoteHtml()}
         <div class="grid grid-2">
           <div class="stack">
             ${num("invest.sharePct", t("house.c.share"), { min: 0, max: 100, step: 5, unit: "%", hint: t("house.c.shareHint") })}

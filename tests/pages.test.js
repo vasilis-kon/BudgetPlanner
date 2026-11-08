@@ -58,7 +58,7 @@ for (const variant of ["empty", "goals", "basic", "full", "short"]) {
     if (variant === "short" && name === "house") {
       expect["house shows the red box"] = (o) => !!o.root.querySelector(".card-danger") && o.text.includes("Your plan overspends");
       expect["house says how much to cut"] = (o) => /Cut at least €\d/.test(o.text);
-      expect["no debt-free date"] = (o) => !o.text.includes("You are debt-free in");
+      expect["no debt-free date"] = (o) => !o.text.includes("Your investments could cover the loan in");
       expect["no charts"] = (o) => !o.root.querySelector("canvas");
     }
     if (variant === "short" && name === "overview") {
@@ -116,7 +116,7 @@ for (const variant of ["empty", "goals", "basic", "full", "short"]) {
     if (name === "house" && variant === "full") {
       expect["stage A shows deposit ready"] = (o) => o.text.includes("Deposit ready in");
       expect["stage B shows an installment"] = (o) => o.text.includes("Monthly installment");
-      expect["stage C shows debt-free"] = (o) => o.text.includes("You are debt-free in");
+      expect["stage C shows debt-free"] = (o) => o.text.includes("Your investments could cover the loan in");
     }
     if (name === "overview" && variant === "full") {
       expect["overview has the year table"] = (o) => o.root.querySelectorAll(".data-table tbody tr").length >= 5;
@@ -130,7 +130,7 @@ for (const variant of ["empty", "goals", "basic", "full", "short"]) {
       expect["tracker compares each category with its baseline"] = (o) => o.root.querySelectorAll(".compare tbody tr").length >= 6 && o.text.includes("How you did against your baselines");
       expect["tracker shows travel with no baseline"] = (o) => o.text.includes("no baseline") && o.text.includes("Travel");
     }
-    if (name === "tracker" && variant === "empty") expect["tracker with nothing logged says so"] = (o) => o.text.includes("No purchases logged for this month yet");
+    if (name === "tracker" && variant === "empty") expect["tracker with nothing logged says so"] = (o) => o.text.includes("No purchases yet this month");
     check(name, variant, expect);
   }
 }

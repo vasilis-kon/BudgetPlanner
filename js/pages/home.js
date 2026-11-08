@@ -1,6 +1,6 @@
 // Page 0: Home. The roadmap: goals, life events, deposit, purchase and debt-free on one timeline,
 // with a "you are here" marker. Each milestone links to the page it belongs to.
-import { noticeHtml } from "../components/notice.js";
+import { noticeHtml, debtFreeNoteHtml } from "../components/notice.js";
 import { t, formatMoney as eur, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
 import { esc } from "../components/dom.js";
@@ -116,6 +116,7 @@ export function render(root) {
       <section class="card" aria-labelledby="road-h">
         <div class="card-head">${icon("map-pinned")}<h2 id="road-h">${t("home.roadmapTitle")}</h2></div>
         ${summary}
+        ${summary ? `<div style="margin:var(--space-4) 0">${debtFreeNoteHtml()}</div>` : ""}
         ${hints.length ? `<div class="stack" style="margin:var(--space-4) 0">${hints.join("")}</div>` : ""}
         <ol class="roadmap" aria-label="${t("home.roadmapTitle")}">${list}</ol>
       </section>

@@ -275,6 +275,7 @@ export function eraseAll() {
   try {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem("bp-nav-collapsed");
+    localStorage.removeItem("bp-lang");
   } catch (e) {}
   listeners.forEach((l) => l(state));
 }

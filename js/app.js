@@ -1,5 +1,5 @@
 // Start-up: builds the page frame, handles hash routes, theme, menu, backup export/import.
-import { t } from "./i18n/index.js";
+import { t, lang, setLang, LANGS } from "./i18n/index.js";
 import { icon } from "./components/icon.js";
 import * as store from "./store.js";
 import * as home from "./pages/home.js";
@@ -47,8 +47,11 @@ function renderHeader() {
       <nav class="main-nav" id="main-nav" aria-label="${t("nav.label")}"><ul>${nav}</ul></nav>
       <div class="header-actions">
         <button type="button" class="btn btn-quiet btn-icon" id="theme-toggle"></button>
-        <button type="button" class="btn btn-quiet menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="main-nav">
-          ${icon("menu")}<span>${t("nav.menu")}</span>
+        <div class="lang-switch" role="group" aria-label="${t("lang.label")}">
+          ${LANGS.map((l) => `<button type="button" class="lang-btn" data-lang="${l}" lang="${l}" aria-pressed="${l === lang}" title="${t("lang.name." + l)}" aria-label="${t("lang.name." + l)}">${l === "el" ? "GR" : "EN"}</button>`).join("")}
+        </div>
+        <button type="button" class="btn btn-quiet btn-icon menu-toggle" id="menu-toggle" aria-label="${t("nav.menu")}" title="${t("nav.menu")}" aria-expanded="false" aria-controls="main-nav">
+          ${icon("menu")}
         </button>
       </div>
     </div>`;
@@ -62,6 +65,7 @@ function renderHeader() {
   });
   wide.addEventListener("change", () => { setMenu(false); syncToggle(); });
   $("theme-toggle").addEventListener("click", toggleTheme);
+  document.querySelectorAll(".lang-btn").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
   updateThemeButton();
   syncToggle();
   setupRailTips();
@@ -77,7 +81,7 @@ function setupRailTips() {
   const header = $("site-header");
   const hide = () => { tip.hidden = true; };
   const show = (e) => {
-    const el = e.target.closest(".main-nav a, .brand, #menu-toggle, #theme-toggle");
+    const el = e.target.closest(".main-nav a, .brand, #menu-toggle, #theme-toggle, .lang-btn");
     if (!el || !wide.matches || !document.documentElement.classList.contains("nav-collapsed")) return hide();
     const span = el.querySelector("span");
     tip.textContent = (span ? span.textContent : el.getAttribute("aria-label") || el.title || "").trim();
@@ -202,6 +206,8 @@ function onHashChange() {
 }
 
 function start() {
+  document.documentElement.lang = lang;
+  document.querySelector('meta[name="description"]')?.setAttribute("content", t("app.description"));
   store.load();
   applyTheme();
   $("skip-link").textContent = t("app.skip");

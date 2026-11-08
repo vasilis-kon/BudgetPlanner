@@ -720,6 +720,28 @@ const lookup = (path) => path.split(".").reduce((o, k) => (o == null ? o : o[k])
   results.push({ name: "every interface-text key used in the code exists in en.js", ok: missing.length === 0, msg: "missing: " + missing.join(", ") });
 }
 
+/* ---------- Greek text: same keys and same {placeholders} as English ---------- */
+{
+  const el = (await import("../js/i18n/el.js")).default;
+  const flat = (o, pre = "", out = {}) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v === "string") out[pre + k] = v;
+      else if (Array.isArray(v)) v.forEach((x, i) => (typeof x === "string" ? (out[`${pre}${k}.${i}`] = x) : flat(x, `${pre}${k}.${i}.`, out)));
+      else flat(v, `${pre}${k}.`, out);
+    }
+    return out;
+  };
+  const a = flat(dict), b = flat(el);
+  const holes = (s) => (s.match(/\{\w+\}/g) || []).sort().join();
+  const problems = [];
+  for (const k of Object.keys(a)) {
+    if (!(k in b)) problems.push("missing in el: " + k);
+    else if (holes(a[k]) !== holes(b[k])) problems.push("placeholders differ: " + k);
+  }
+  for (const k of Object.keys(b)) if (!(k in a)) problems.push("extra in el: " + k);
+  results.push({ name: "Greek text has the same keys and placeholders as English", ok: problems.length === 0, msg: problems.slice(0, 10).join("; ") });
+}
+
 /* ---------- savings view (no House Planner) ---------- */
 const noHouse = (over = {}) => { const st = baseState(over); st.house.amount = null; return st; };
 const savings = (st) => { const inp = inputFromState(st, TODAY); return projectSavings(inp, prepare(inp)); };

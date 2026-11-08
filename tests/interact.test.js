@@ -350,7 +350,7 @@ test("house: a plan that already overspends shows the red box with what to cut, 
   is(box.textContent.includes("Your plan overspends"), "red box shown");
   is(/Cut at least €\d/.test(box.textContent), "says how much to cut");
   is(box.textContent.includes("essential") || box.textContent.includes("flexible"), "lists categories");
-  is(!$("#res-c").textContent.includes("You are debt-free in"), "no debt-free date while overspending");
+  is(!$("#res-c").textContent.includes("Your investments could cover the loan in"), "no debt-free date while overspending");
   is($("#res-c").textContent.includes("overspends"), "says why");
   is($("#res-b").textContent.includes("cannot afford this installment"), "the installment is called unaffordable");
   is($("#res-a").textContent.includes("Deposit ready in"), "the deposit date is still valid (only the installment overspends)");
@@ -359,7 +359,7 @@ test("house: fixing the overspending (a smaller house) brings the results back",
   start("short", house);
   type($("#f-amount"), "150000");
   eq($("#res-overspend").textContent.trim(), "", "red box gone");
-  is($("#res-c").textContent.includes("You are debt-free in"), "debt-free date is back");
+  is($("#res-c").textContent.includes("Your investments could cover the loan in"), "debt-free date is back");
 });
 test("house: an event needs a name and at least one change", () => {
   start("basic", house);
@@ -592,7 +592,7 @@ test("house: support income switches on and only one type shows at a time", () =
 });
 test("house: room rent brings the debt-free date forward", () => {
   start("basic", house);
-  const text = () => $("#res-c").textContent.match(/You are debt-free in\s*([A-Za-z]+ \d{4})/)?.[1];
+  const text = () => $("#res-c").textContent.match(/Your investments could cover the loan in\s*([A-Za-z]+ \d{4})/)?.[1];
   const without = text();
   const box = $("#support-on"); box.checked = true; box.dispatchEvent(new Event("change", { bubbles: true }));
   const withRent = text();
@@ -767,7 +767,7 @@ test("tracker: dropping a category moves its logged purchases to Other", () => {
 });
 test("tracker: without a plan it asks you to set up the Budget Plan first", () => {
   store.eraseAll(); stage.innerHTML = ""; tracker.render(stage);
-  is(stage.textContent.includes("set up your Budget Plan first") && !!$('a[href="#/budget"]'), "prompt with a link");
+  is(stage.textContent.includes("Set up your Budget Plan first") && !!$('a[href="#/budget"]'), "prompt with a link");
 });
 
 /* ---------- House Planner switch, required price, monthly investing, paying the loan off ---------- */

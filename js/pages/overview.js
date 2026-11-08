@@ -1,5 +1,5 @@
 // Page 4: Overview. Where the user's money sits at the end of each year, from the first salary to debt-free.
-import { noticeHtml } from "../components/notice.js";
+import { noticeHtml, debtFreeNoteHtml } from "../components/notice.js";
 import { t, formatWhole as eur, formatCompact, formatMonth } from "../i18n/index.js";
 import { icon } from "../components/icon.js";
 import { esc } from "../components/dom.js";
@@ -166,6 +166,7 @@ export function render(root) {
           <h2 id="ov-bar">${t("overview.barTitle")}</h2>
           ${bar}
           ${stats}
+          ${debtFreeNoteHtml()}
           ${ageHint}
         </section>
         <section class="card" aria-labelledby="ov-chart">
